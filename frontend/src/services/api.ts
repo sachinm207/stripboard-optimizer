@@ -1,0 +1,111 @@
+import { Scene, Actor, ScheduleSolution, DisruptionAlert, KafkaStatus, UnionAudit } from '../types';
+
+const API_BASE = '/api';
+
+export async function fetchSchedule(): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/schedule`);
+  if (!res.ok) throw new Error('Failed to fetch schedule');
+  return res.json();
+}
+
+export async function fetchScenes(): Promise<Scene[]> {
+  const res = await fetch(`${API_BASE}/scenes`);
+  if (!res.ok) throw new Error('Failed to fetch scenes');
+  return res.json();
+}
+
+export async function fetchActors(): Promise<Actor[]> {
+  const res = await fetch(`${API_BASE}/actors`);
+  if (!res.ok) throw new Error('Failed to fetch actors');
+  return res.json();
+}
+
+export async function fetchKafkaStatus(): Promise<KafkaStatus> {
+  const res = await fetch(`${API_BASE}/kafka/status`);
+  if (!res.ok) throw new Error('Failed to fetch Kafka status');
+  return res.json();
+}
+
+export async function fetchUnionAudit(): Promise<UnionAudit> {
+  const res = await fetch(`${API_BASE}/union/audit`);
+  if (!res.ok) throw new Error('Failed to fetch Union audit');
+  return res.json();
+}
+
+export async function injectDisruption(alert: DisruptionAlert): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/schedule/disrupt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(alert),
+  });
+  if (!res.ok) throw new Error('Failed to inject disruption');
+  return res.json();
+}
+
+export async function resetSchedule(): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/schedule/reset`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to reset schedule');
+  return res.json();
+}
+
+export async function generateGeminiMemo(): Promise<{ memo: string }> {
+  const res = await fetch(`${API_BASE}/memo/generate`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to generate Gemini memo');
+  return res.json();
+}
+
+export async function importProduction(payload: any): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Import failed' }));
+    throw new Error(err.detail || 'Failed to import custom production');
+  }
+  return res.json();
+}
+
+export async function importCSVProduction(payload: {
+  title: string;
+  csv_content: string;
+  num_days?: number;
+  max_minutes_per_day?: number;
+  w_turnaround?: number;
+}): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/import-csv`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'CSV Import failed' }));
+    throw new Error(err.detail || 'Failed to import CSV breakdown');
+  }
+  return res.json();
+}
+
+export async function loadPreset(presetId: string): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/load-preset?preset_id=${presetId}`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to load production preset');
+  return res.json();
+}
+
+export async function injectDisruptionBatch(alerts: DisruptionAlert[]): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/schedule/disrupt-batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alerts }),
+  });
+  if (!res.ok) throw new Error('Failed to inject disruption batch');
+  return res.json();
+}
+
+

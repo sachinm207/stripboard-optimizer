@@ -1,0 +1,686 @@
+{
+  "production_id": "prod_neon_horizon_20d",
+  "title": "Neon Horizon (20-Day Feature Cut)",
+  "num_days": 20,
+  "max_minutes_per_day": 600,
+  "actors": [
+    {
+      "actor_id": "ACTOR_SARAH",
+      "name": "Sarah Vance",
+      "character_name": "Sarah Vance (Rogue Agent)",
+      "cast_number": 1,
+      "day_rate": 5000.0,
+      "hold_rate": 2500.0,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_MARCUS",
+      "name": "David Sterling",
+      "character_name": "Det. Marcus Cole",
+      "cast_number": 2,
+      "day_rate": 4500.0,
+      "hold_rate": 2000.0,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_ELENA",
+      "name": "Elena Rostova",
+      "character_name": "The Syndicate Boss",
+      "cast_number": 3,
+      "day_rate": 4000.0,
+      "hold_rate": 1800.0,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_FRANK",
+      "name": "Frank Moretti",
+      "character_name": "Frank 'The Fixer'",
+      "cast_number": 4,
+      "day_rate": 2500.0,
+      "hold_rate": 1200.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    },
+    {
+      "actor_id": "ACTOR_ALVAREZ",
+      "name": "Maria Alvarez",
+      "character_name": "Chief Alvarez",
+      "cast_number": 5,
+      "day_rate": 2200.0,
+      "hold_rate": 1100.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    },
+    {
+      "actor_id": "ACTOR_LEO",
+      "name": "Leo 'The Rat'",
+      "character_name": "Informant Leo",
+      "cast_number": 6,
+      "day_rate": 1500.0,
+      "hold_rate": 750.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    },
+    {
+      "actor_id": "ACTOR_CHLOE",
+      "name": "Chloe Vance",
+      "character_name": "Chloe (Sarah's Sister)",
+      "cast_number": 7,
+      "day_rate": 1800.0,
+      "hold_rate": 900.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    },
+    {
+      "actor_id": "ACTOR_VIKTOR",
+      "name": "Viktor Kozlov",
+      "character_name": "Syndicate Enforcer",
+      "cast_number": 8,
+      "day_rate": 1400.0,
+      "hold_rate": 700.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    },
+    {
+      "actor_id": "ACTOR_JUDGE",
+      "name": "Judge Campbell",
+      "character_name": "Judge Campbell",
+      "cast_number": 9,
+      "day_rate": 2000.0,
+      "hold_rate": 1000.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    },
+    {
+      "actor_id": "ACTOR_FORENSIC",
+      "name": "Dr. Aris Thorne",
+      "character_name": "Chief Medical Examiner",
+      "cast_number": 10,
+      "day_rate": 1600.0,
+      "hold_rate": 800.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    }
+  ],
+  "scenes": [
+    {
+      "scene_id": "SC_01",
+      "scene_number": "1",
+      "slugline": "EXT. WAREHOUSE DISTRICT - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Warehouse District",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_LEO"
+      ],
+      "description": "Sarah meets Leo in the foggy shadows of the loading docks."
+    },
+    {
+      "scene_id": "SC_02",
+      "scene_number": "2",
+      "slugline": "INT. WAREHOUSE - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Warehouse District",
+      "pages_eighths": 24,
+      "est_shoot_minutes": 180,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_MARCUS",
+        "ACTOR_FRANK"
+      ],
+      "description": "Gunfire erupts inside the empty container storage bay."
+    },
+    {
+      "scene_id": "SC_03",
+      "scene_number": "3",
+      "slugline": "EXT. CITY DOCKS - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "City Docks",
+      "pages_eighths": 18,
+      "est_shoot_minutes": 170,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_VIKTOR"
+      ],
+      "description": "High-speed chase across the wet shipping containers."
+    },
+    {
+      "scene_id": "SC_04",
+      "scene_number": "4",
+      "slugline": "INT. CARGO SHIP HOLD - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "City Docks",
+      "pages_eighths": 20,
+      "est_shoot_minutes": 190,
+      "cast_ids": [
+        "ACTOR_VIKTOR",
+        "ACTOR_FRANK"
+      ],
+      "description": "Viktor secures the smuggled biometric drive."
+    },
+    {
+      "scene_id": "SC_05",
+      "scene_number": "5",
+      "slugline": "EXT. WAREHOUSE ROOFTOP - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Warehouse District",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 140,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_MARCUS"
+      ],
+      "description": "Standoff under rain as sirens wail in the distance.",
+      "precedence_before": [
+        "SC_02"
+      ]
+    },
+    {
+      "scene_id": "SC_06",
+      "scene_number": "6",
+      "slugline": "INT. POLICE PRECINCT BULLPEN - DAY",
+      "setting": "INT_DAY",
+      "location": "Police Precinct",
+      "pages_eighths": 22,
+      "est_shoot_minutes": 180,
+      "cast_ids": [
+        "ACTOR_MARCUS",
+        "ACTOR_ALVAREZ"
+      ],
+      "description": "Chief Alvarez confronts Marcus over the botched docks raid."
+    },
+    {
+      "scene_id": "SC_07",
+      "scene_number": "7",
+      "slugline": "INT. INTERROGATION ROOM B - DAY",
+      "setting": "INT_DAY",
+      "location": "Police Precinct",
+      "pages_eighths": 20,
+      "est_shoot_minutes": 170,
+      "cast_ids": [
+        "ACTOR_MARCUS",
+        "ACTOR_LEO"
+      ],
+      "description": "Marcus interrogates bruised Leo under harsh fluorescent light."
+    },
+    {
+      "scene_id": "SC_08",
+      "scene_number": "8",
+      "slugline": "INT. COUNTY MORGUE - DAY",
+      "setting": "INT_DAY",
+      "location": "County Morgue",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": [
+        "ACTOR_MARCUS",
+        "ACTOR_FORENSIC"
+      ],
+      "description": "Dr. Thorne extracts synthetic cipher fragments from the victim's collar."
+    },
+    {
+      "scene_id": "SC_09",
+      "scene_number": "9",
+      "slugline": "INT. MORGUE COLD STORAGE - DAY",
+      "setting": "INT_DAY",
+      "location": "County Morgue",
+      "pages_eighths": 12,
+      "est_shoot_minutes": 120,
+      "cast_ids": [
+        "ACTOR_FORENSIC"
+      ],
+      "description": "Thorne verifies the toxic chemical signature matching Elena's syndicate."
+    },
+    {
+      "scene_id": "SC_10",
+      "scene_number": "10",
+      "slugline": "INT. PRECINCT EVIDENCE LOCKER - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Police Precinct",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 140,
+      "cast_ids": [
+        "ACTOR_MARCUS",
+        "ACTOR_FRANK"
+      ],
+      "description": "Frank covertly tampers with barcode logs inside evidence storage."
+    },
+    {
+      "scene_id": "SC_11",
+      "scene_number": "11",
+      "slugline": "INT. ELENA'S PENTHOUSE SALON - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Elena's Penthouse",
+      "pages_eighths": 24,
+      "est_shoot_minutes": 210,
+      "cast_ids": [
+        "ACTOR_ELENA",
+        "ACTOR_VIKTOR"
+      ],
+      "description": "Elena sips champagne overlooking skyline while ordering Marcus eliminated."
+    },
+    {
+      "scene_id": "SC_12",
+      "scene_number": "12",
+      "slugline": "INT. PENTHOUSE PRIVATE VAULT - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Elena's Penthouse",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 160,
+      "cast_ids": [
+        "ACTOR_ELENA",
+        "ACTOR_FRANK"
+      ],
+      "description": "Elena hands Frank a cryptographic key for the municipal server."
+    },
+    {
+      "scene_id": "SC_13",
+      "scene_number": "13",
+      "slugline": "EXT. CHINATOWN ALLEY - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Chinatown Alley",
+      "pages_eighths": 18,
+      "est_shoot_minutes": 180,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_CHLOE"
+      ],
+      "description": "Sarah hands passport and cash to her frightened younger sister Chloe."
+    },
+    {
+      "scene_id": "SC_14",
+      "scene_number": "14",
+      "slugline": "INT. CHINATOWN NOODLE SHOP - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Chinatown Alley",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 160,
+      "cast_ids": [
+        "ACTOR_CHLOE",
+        "ACTOR_LEO"
+      ],
+      "description": "Leo slips a thumb-drive into Chloe's purse before syndicate cars pull up."
+    },
+    {
+      "scene_id": "SC_15",
+      "scene_number": "15",
+      "slugline": "EXT. CHINATOWN ROOFS - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Chinatown Alley",
+      "pages_eighths": 20,
+      "est_shoot_minutes": 190,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_VIKTOR"
+      ],
+      "description": "Sarah defends Chloe against Viktor's hit squad across neon fire escapes."
+    },
+    {
+      "scene_id": "SC_16",
+      "scene_number": "16",
+      "slugline": "INT. SUBWAY MEZZANINE - DAY",
+      "setting": "INT_DAY",
+      "location": "Subway Station",
+      "pages_eighths": 20,
+      "est_shoot_minutes": 190,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_MARCUS"
+      ],
+      "description": "Marcus corners Sarah at turnstiles; they realize they were both framed."
+    },
+    {
+      "scene_id": "SC_17",
+      "scene_number": "17",
+      "slugline": "INT. SUBWAY TRAIN PLATFORM - DAY",
+      "setting": "INT_DAY",
+      "location": "Subway Station",
+      "pages_eighths": 22,
+      "est_shoot_minutes": 200,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_MARCUS",
+        "ACTOR_VIKTOR"
+      ],
+      "description": "Gun battle amidst fleeing commuters as incoming train screeches."
+    },
+    {
+      "scene_id": "SC_18",
+      "scene_number": "18",
+      "slugline": "INT. SUBWAY TUNNEL PUMP ROOM - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Subway Station",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 160,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_CHLOE"
+      ],
+      "description": "Sarah binds wounded Chloe's arm in dripping utility alcove."
+    },
+    {
+      "scene_id": "SC_19",
+      "scene_number": "19",
+      "slugline": "INT. COURTHOUSE ROTUNDA - DAY",
+      "setting": "INT_DAY",
+      "location": "Municipal Courthouse",
+      "pages_eighths": 18,
+      "est_shoot_minutes": 170,
+      "cast_ids": [
+        "ACTOR_ALVAREZ",
+        "ACTOR_JUDGE"
+      ],
+      "description": "Chief Alvarez requests a secret emergency wiretap warrant from Judge Campbell."
+    },
+    {
+      "scene_id": "SC_20",
+      "scene_number": "20",
+      "slugline": "INT. JUDGE'S CHAMBERS - DAY",
+      "setting": "INT_DAY",
+      "location": "Municipal Courthouse",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": [
+        "ACTOR_JUDGE",
+        "ACTOR_FRANK"
+      ],
+      "description": "Frank attempts to intimidate Judge Campbell with kompromat photos."
+    },
+    {
+      "scene_id": "SC_21",
+      "scene_number": "21",
+      "slugline": "INT. WAREHOUSE PACKING LINE - DAY",
+      "setting": "INT_DAY",
+      "location": "Warehouse District",
+      "pages_eighths": 20,
+      "est_shoot_minutes": 180,
+      "cast_ids": [
+        "ACTOR_FRANK",
+        "ACTOR_VIKTOR"
+      ],
+      "description": "Syndicate crew loads weaponized fentanyl into industrial canisters."
+    },
+    {
+      "scene_id": "SC_22",
+      "scene_number": "22",
+      "slugline": "EXT. WAREHOUSE PERIMETER FENCE - DAY",
+      "setting": "EXT_DAY",
+      "location": "Warehouse District",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 130,
+      "cast_ids": [
+        "ACTOR_MARCUS"
+      ],
+      "description": "Marcus photographs delivery trucks with telephoto lens."
+    },
+    {
+      "scene_id": "SC_23",
+      "scene_number": "23",
+      "slugline": "EXT. CITY DOCKS CRANE GANTRY - DAY",
+      "setting": "EXT_DAY",
+      "location": "City Docks",
+      "pages_eighths": 24,
+      "est_shoot_minutes": 220,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_MARCUS"
+      ],
+      "description": "Sarah and Marcus tap the satellite uplink 120 feet above water."
+    },
+    {
+      "scene_id": "SC_24",
+      "scene_number": "24",
+      "slugline": "INT. HARBORMASTER TOWER - DAY",
+      "setting": "INT_DAY",
+      "location": "City Docks",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": [
+        "ACTOR_MARCUS",
+        "ACTOR_LEO"
+      ],
+      "description": "Leo reveals the offshore container ID before attempting escape."
+    },
+    {
+      "scene_id": "SC_25",
+      "scene_number": "25",
+      "slugline": "INT. PRECINCT CHIEF'S OFFICE - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Police Precinct",
+      "pages_eighths": 18,
+      "est_shoot_minutes": 170,
+      "cast_ids": [
+        "ACTOR_ALVAREZ",
+        "ACTOR_MARCUS"
+      ],
+      "description": "Marcus proves Frank is on syndicate payroll; Alvarez authorizes arrest."
+    },
+    {
+      "scene_id": "SC_26",
+      "scene_number": "26",
+      "slugline": "INT. PRECINCT PARKING GARAGE - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Police Precinct",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": [
+        "ACTOR_FRANK",
+        "ACTOR_ALVAREZ"
+      ],
+      "description": "Frank ambushes Alvarez at squad car; Marcus intervenes in shootout."
+    },
+    {
+      "scene_id": "SC_27",
+      "scene_number": "27",
+      "slugline": "INT. COUNTY MORGUE LAB - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "County Morgue",
+      "pages_eighths": 15,
+      "est_shoot_minutes": 140,
+      "cast_ids": [
+        "ACTOR_FORENSIC",
+        "ACTOR_SARAH"
+      ],
+      "description": "Dr. Thorne synthesizes antidote compound directly for Sarah."
+    },
+    {
+      "scene_id": "SC_28",
+      "scene_number": "28",
+      "slugline": "INT. ELENA'S PENTHOUSE TERRACE - DAY",
+      "setting": "INT_DAY",
+      "location": "Elena's Penthouse",
+      "pages_eighths": 20,
+      "est_shoot_minutes": 180,
+      "cast_ids": [
+        "ACTOR_ELENA",
+        "ACTOR_FRANK"
+      ],
+      "description": "Elena berates Frank for police intervention and cancels his offshore wire."
+    },
+    {
+      "scene_id": "SC_29",
+      "scene_number": "29",
+      "slugline": "INT. PENTHOUSE WINE CELLAR - DAY",
+      "setting": "INT_DAY",
+      "location": "Elena's Penthouse",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 130,
+      "cast_ids": [
+        "ACTOR_ELENA",
+        "ACTOR_VIKTOR"
+      ],
+      "description": "Elena arms Viktor with titanium-cased detonator."
+    },
+    {
+      "scene_id": "SC_30",
+      "scene_number": "30",
+      "slugline": "EXT. CHINATOWN STREET MARKET - DAY",
+      "setting": "EXT_DAY",
+      "location": "Chinatown Alley",
+      "pages_eighths": 22,
+      "est_shoot_minutes": 200,
+      "cast_ids": [
+        "ACTOR_CHLOE",
+        "ACTOR_MARCUS"
+      ],
+      "description": "Marcus escorts Chloe through bustling crowds dodging undercover spotters."
+    },
+    {
+      "scene_id": "SC_31",
+      "scene_number": "31",
+      "slugline": "INT. CHINATOWN APARTMENT - DAY",
+      "setting": "INT_DAY",
+      "location": "Chinatown Alley",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": [
+        "ACTOR_CHLOE",
+        "ACTOR_SARAH"
+      ],
+      "description": "Tearful reunion as Chloe gives Sarah the biometric decryption dongle."
+    },
+    {
+      "scene_id": "SC_32",
+      "scene_number": "32",
+      "slugline": "INT. COURTHOUSE GRAND COURTROOM - DAY",
+      "setting": "INT_DAY",
+      "location": "Municipal Courthouse",
+      "pages_eighths": 25,
+      "est_shoot_minutes": 220,
+      "cast_ids": [
+        "ACTOR_JUDGE",
+        "ACTOR_ALVAREZ",
+        "ACTOR_ELENA"
+      ],
+      "description": "Injunction hearing where Elena's high-priced lawyers face off with Alvarez."
+    },
+    {
+      "scene_id": "SC_33",
+      "scene_number": "33",
+      "slugline": "INT. COURTHOUSE BASEMENT CELLS - DAY",
+      "setting": "INT_DAY",
+      "location": "Municipal Courthouse",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 140,
+      "cast_ids": [
+        "ACTOR_JUDGE",
+        "ACTOR_MARCUS"
+      ],
+      "description": "Judge Campbell signs emergency unsealing order in holding cell hallway."
+    },
+    {
+      "scene_id": "SC_34",
+      "scene_number": "34",
+      "slugline": "INT. SUBWAY CONTROL CENTER - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Subway Station",
+      "pages_eighths": 18,
+      "est_shoot_minutes": 170,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_VIKTOR"
+      ],
+      "description": "Brutal hand-to-hand fight across dispatch monitors as trains halt."
+    },
+    {
+      "scene_id": "SC_35",
+      "scene_number": "35",
+      "slugline": "EXT. SUBWAY VENTILATION GRATE - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Subway Station",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 130,
+      "cast_ids": [
+        "ACTOR_MARCUS",
+        "ACTOR_LEO"
+      ],
+      "description": "Marcus pulls terrified Leo from sewer outlet as sirens swarm."
+    },
+    {
+      "scene_id": "SC_36",
+      "scene_number": "36",
+      "slugline": "INT. ELENA'S PENTHOUSE HELIPAD - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Elena's Penthouse",
+      "pages_eighths": 24,
+      "est_shoot_minutes": 220,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_ELENA",
+        "ACTOR_MARCUS"
+      ],
+      "description": "Wind whipped showdown as helicopter blades spin; Elena holds the master trigger."
+    },
+    {
+      "scene_id": "SC_37",
+      "scene_number": "37",
+      "slugline": "INT. PENTHOUSE OBSERVATION DECK - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Elena's Penthouse",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 160,
+      "cast_ids": [
+        "ACTOR_ELENA",
+        "ACTOR_SARAH"
+      ],
+      "description": "Glass shatters as Sarah tackles Elena through the skylight."
+    },
+    {
+      "scene_id": "SC_38",
+      "scene_number": "38",
+      "slugline": "EXT. CITY DOCKS PIER 14 - DAY",
+      "setting": "EXT_DAY",
+      "location": "City Docks",
+      "pages_eighths": 18,
+      "est_shoot_minutes": 170,
+      "cast_ids": [
+        "ACTOR_MARCUS",
+        "ACTOR_ALVAREZ"
+      ],
+      "description": "Federal marshals inventory seized shipping containers at sunrise."
+    },
+    {
+      "scene_id": "SC_39",
+      "scene_number": "39",
+      "slugline": "INT. COUNTY MORGUE AUTOPSY SUITE - DAY",
+      "setting": "INT_DAY",
+      "location": "County Morgue",
+      "pages_eighths": 12,
+      "est_shoot_minutes": 120,
+      "cast_ids": [
+        "ACTOR_FORENSIC",
+        "ACTOR_ALVAREZ"
+      ],
+      "description": "Dr. Thorne closes the final coroner file on the syndicate casualties."
+    },
+    {
+      "scene_id": "SC_40",
+      "scene_number": "40",
+      "slugline": "EXT. HARBOR OVERLOOK - SUNSET",
+      "setting": "EXT_DAY",
+      "location": "City Docks",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": [
+        "ACTOR_SARAH",
+        "ACTOR_CHLOE",
+        "ACTOR_MARCUS"
+      ],
+      "description": "Sarah and Chloe watch the ferry depart into the golden horizon with Marcus."
+    }
+  ]
+}

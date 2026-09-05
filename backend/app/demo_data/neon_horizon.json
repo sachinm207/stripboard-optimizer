@@ -1,0 +1,220 @@
+{
+  "production_id": "prod_neon_horizon",
+  "title": "Neon Horizon",
+  "num_days": 5,
+  "max_minutes_per_day": 600,
+  "actors": [
+    {
+      "actor_id": "ACTOR_SARAH",
+      "name": "Sarah Vance",
+      "character_name": "Sarah Vance (Rogue Agent)",
+      "cast_number": 1,
+      "day_rate": 5000.0,
+      "hold_rate": 2500.0,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_MARCUS",
+      "name": "David Sterling",
+      "character_name": "Det. Marcus Cole",
+      "cast_number": 2,
+      "day_rate": 4500.0,
+      "hold_rate": 2000.0,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_ELENA",
+      "name": "Elena Rostova",
+      "character_name": "The Syndicate Boss",
+      "cast_number": 3,
+      "day_rate": 4000.0,
+      "hold_rate": 1800.0,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_FRANK",
+      "name": "Frank 'The Fixer'",
+      "character_name": "Frank",
+      "cast_number": 4,
+      "day_rate": 2500.0,
+      "hold_rate": 1200.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    },
+    {
+      "actor_id": "ACTOR_ALVAREZ",
+      "name": "Chief Alvarez",
+      "character_name": "Police Chief Alvarez",
+      "cast_number": 5,
+      "day_rate": 2000.0,
+      "hold_rate": 1000.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    },
+    {
+      "actor_id": "ACTOR_LEO",
+      "name": "Leo the Snitch",
+      "character_name": "Informant Leo",
+      "cast_number": 6,
+      "day_rate": 1500.0,
+      "hold_rate": 800.0,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    }
+  ],
+  "scenes": [
+    {
+      "scene_id": "SC_01",
+      "scene_number": "1",
+      "slugline": "EXT. WAREHOUSE DISTRICT - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Warehouse District",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": ["ACTOR_SARAH", "ACTOR_LEO"],
+      "description": "Sarah meets Leo in the foggy shadows of the loading docks.",
+      "requires_pyro": false
+    },
+    {
+      "scene_id": "SC_02",
+      "scene_number": "2",
+      "slugline": "INT. WAREHOUSE - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Warehouse District",
+      "pages_eighths": 24,
+      "est_shoot_minutes": 180,
+      "cast_ids": ["ACTOR_SARAH", "ACTOR_MARCUS", "ACTOR_FRANK"],
+      "description": "Gunfire erupts inside the empty container storage bay.",
+      "requires_pyro": true
+    },
+    {
+      "scene_id": "SC_03",
+      "scene_number": "3",
+      "slugline": "EXT. WAREHOUSE ROOFTOP - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Warehouse District",
+      "pages_eighths": 12,
+      "est_shoot_minutes": 120,
+      "cast_ids": ["ACTOR_SARAH", "ACTOR_MARCUS"],
+      "description": "Marcus corners Sarah at the ledge above the rainy city.",
+      "requires_pyro": false
+    },
+    {
+      "scene_id": "SC_04",
+      "scene_number": "4",
+      "slugline": "INT. POLICE PRECINCT - DAY",
+      "setting": "INT_DAY",
+      "location": "Police Precinct",
+      "pages_eighths": 20,
+      "est_shoot_minutes": 160,
+      "cast_ids": ["ACTOR_MARCUS", "ACTOR_ALVAREZ"],
+      "description": "Chief Alvarez orders Marcus off the syndicate case.",
+      "requires_pyro": false
+    },
+    {
+      "scene_id": "SC_05",
+      "scene_number": "5",
+      "slugline": "INT. PRECINCT LOCKER ROOM - DAY",
+      "setting": "INT_DAY",
+      "location": "Police Precinct",
+      "pages_eighths": 8,
+      "est_shoot_minutes": 90,
+      "cast_ids": ["ACTOR_MARCUS"],
+      "description": "Marcus packs his sidearm and encrypted burner phone in secret.",
+      "requires_pyro": false
+    },
+    {
+      "scene_id": "SC_06",
+      "scene_number": "6",
+      "slugline": "INT. CHINATOWN PENTHOUSE - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Chinatown Penthouse",
+      "pages_eighths": 22,
+      "est_shoot_minutes": 180,
+      "cast_ids": ["ACTOR_ELENA", "ACTOR_FRANK"],
+      "description": "Elena reviews biometric encryption keys with Frank.",
+      "requires_pyro": false
+    },
+    {
+      "scene_id": "SC_07",
+      "scene_number": "7",
+      "slugline": "INT. CHINATOWN PENTHOUSE WINE CELLAR - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Chinatown Penthouse",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 130,
+      "cast_ids": ["ACTOR_ELENA", "ACTOR_SARAH"],
+      "description": "Sarah infiltrates the cellar; Elena anticipates the ambush.",
+      "requires_pyro": false
+    },
+    {
+      "scene_id": "SC_08",
+      "scene_number": "8",
+      "slugline": "EXT. HARBOR PIER 42 - DAY",
+      "setting": "EXT_DAY",
+      "location": "Harbor Pier 42",
+      "pages_eighths": 18,
+      "est_shoot_minutes": 160,
+      "cast_ids": ["ACTOR_SARAH", "ACTOR_FRANK"],
+      "description": "Hand-off of the decrypted microdrive by the industrial cranes.",
+      "requires_pyro": false
+    },
+    {
+      "scene_id": "SC_09",
+      "scene_number": "9",
+      "slugline": "EXT. HARBOR CRANE CRASH - DAY",
+      "setting": "EXT_DAY",
+      "location": "Harbor Pier 42",
+      "pages_eighths": 28,
+      "est_shoot_minutes": 220,
+      "cast_ids": ["ACTOR_SARAH", "ACTOR_MARCUS", "ACTOR_FRANK"],
+      "description": "Massive car chase ends with cargo container collapse.",
+      "requires_pyro": true
+    },
+    {
+      "scene_id": "SC_10",
+      "scene_number": "10",
+      "slugline": "INT. PRECINCT INTERROGATION ROOM - DAY",
+      "setting": "INT_DAY",
+      "location": "Police Precinct",
+      "pages_eighths": 15,
+      "est_shoot_minutes": 120,
+      "cast_ids": ["ACTOR_ALVAREZ", "ACTOR_LEO"],
+      "description": "Alvarez interrogates Leo regarding Sarah's safehouse.",
+      "requires_pyro": false
+    },
+    {
+      "scene_id": "SC_11",
+      "scene_number": "11",
+      "slugline": "EXT. DESERT HIGHWAY - DAY",
+      "setting": "EXT_DAY",
+      "location": "Desert Highway",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": ["ACTOR_SARAH", "ACTOR_ELENA"],
+      "description": "Final showdown under the blinding desert sun.",
+      "requires_pyro": true
+    },
+    {
+      "scene_id": "SC_12",
+      "scene_number": "12",
+      "slugline": "EXT. DESERT OVERLOOK - DAY",
+      "setting": "EXT_DAY",
+      "location": "Desert Highway",
+      "pages_eighths": 10,
+      "est_shoot_minutes": 100,
+      "cast_ids": ["ACTOR_MARCUS", "ACTOR_SARAH"],
+      "description": "Marcus lets Sarah disappear into the canyon sunset.",
+      "requires_pyro": false
+    }
+  ]
+}
