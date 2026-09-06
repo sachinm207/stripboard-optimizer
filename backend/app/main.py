@@ -497,6 +497,8 @@ async def inject_disruption_batch(req: DisruptBatchRequest):
 @app.post("/api/schedule/reset", response_model=ScheduleSolution)
 async def reset_schedule():
     STATE["active_disruptions"] = []
+    for s in STATE["scenes"]:
+        s.locked_day = None
     solver = StripboardSolver(
         scenes=STATE["scenes"],
         actors=STATE["actors"],
@@ -505,8 +507,8 @@ async def reset_schedule():
         w_turnaround=STATE["w_turnaround"],
         permit_lead_days=STATE["permit_lead_days"]
     )
-    solution = solver.solve(disruptions=[])
-    solution.production_id = STATE["production_id"]
+    solution = solver.solve(disruptions=[], naive_cost=STATE.get("naive_cost", None))
+    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
     solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
     STATE["current_solution"] = solution
     await event_bus.publish("schedule.optimized.solution", solution.model_dump())

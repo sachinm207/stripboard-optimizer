@@ -47,17 +47,6 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onLockScene }) => 
           return (
             <div
               key={day.day_number}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                const sceneId = e.dataTransfer.getData('text/plain');
-                if (sceneId && onLockScene) {
-                  onLockScene(sceneId, day.day_number);
-                }
-              }}
               className="bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-colors rounded-xl p-3 shadow-sm flex flex-col md:flex-row gap-3 md:gap-4 items-stretch"
             >
               {/* Left Column: Day Headline, Call Type, Locations, Metrics */}
@@ -121,7 +110,7 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onLockScene }) => 
               <div className="flex-1 min-w-0 flex flex-col justify-center space-y-0.5">
                 {day.scenes.length === 0 ? (
                   <div className="py-6 text-center text-slate-500 text-xs flex items-center justify-center gap-2 border-2 border-dashed border-slate-800/80 rounded-lg">
-                    <AlertCircle className="w-4 h-4" /> Drop scene strips here to schedule onto Day {day.day_number}
+                    <AlertCircle className="w-4 h-4" /> No scenes scheduled on Day {day.day_number}. Use "Move to..." on any scene to schedule it here.
                   </div>
                 ) : (
                   day.scenes.map((scene) => (

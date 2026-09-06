@@ -419,12 +419,12 @@ export const App: React.FC = () => {
                     <span>Throw Chaos</span>
                   </button>
                   <button
-                    onClick={handleReset}
+                    onClick={() => handleLoadPreset(solution.production_id, false)}
                     disabled={isSolving}
-                    className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-all"
-                    title="Reset to script order baseline"
+                    className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-all cursor-pointer"
+                    title="Switch back to view the raw unoptimized screenplay order"
                   >
-                    Script Order
+                    View Raw Script Order
                   </button>
                 </div>
               </div>

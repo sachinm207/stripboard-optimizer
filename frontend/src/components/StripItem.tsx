@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flame, Clock, File, Lock, Unlock, Pin } from 'lucide-react';
+import { Flame, Clock, File, Lock } from 'lucide-react';
 import { Scene } from '../types';
 
 interface StripItemProps {
@@ -48,12 +48,7 @@ export const StripItem: React.FC<StripItemProps> = ({
 
   return (
     <div
-      draggable={true}
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', scene.scene_id);
-        e.dataTransfer.effectAllowed = 'move';
-      }}
-      className={`rounded-md border px-2.5 py-1.5 my-0.5 shadow-sm transition-all hover:scale-[1.008] hover:shadow-md cursor-grab active:cursor-grabbing select-none flex items-center justify-between gap-2 text-xs ${colorClasses}`}
+      className={`rounded-md border px-2.5 py-1.5 my-0.5 shadow-sm transition-all select-none flex items-center justify-between gap-2 text-xs ${colorClasses}`}
     >
       {/* Left & Middle: Scene #, Slugline, Description, and Cast in the main row */}
       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -90,7 +85,7 @@ export const StripItem: React.FC<StripItemProps> = ({
         )}
       </div>
 
-      {/* Right: Pyro, Duration, Pages, Pin/Lock Override */}
+      {/* Right: Pyro, Duration, Pages, Move/Lock Controls */}
       <div className="flex items-center gap-1.5 shrink-0">
         {scene.requires_pyro && (
           <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-bold uppercase tracking-wider animate-pulse">
@@ -106,19 +101,19 @@ export const StripItem: React.FC<StripItemProps> = ({
           <Clock className="w-2.5 h-2.5" /> {scene.est_shoot_minutes}m
         </span>
 
-        {/* Interactive Scene Lock / Pin Override */}
+        {/* Move / Lock to Day Dropdown */}
         {onLockScene && (
           <div className="flex items-center gap-1 ml-0.5" onClick={(e) => e.stopPropagation()}>
             {scene.locked_day != null ? (
-              <div className="flex items-center gap-1 bg-amber-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm">
+              <div className="flex items-center gap-1 bg-amber-600 text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-sm">
                 <Lock className="w-2.5 h-2.5" />
-                <span>D{scene.locked_day}</span>
+                <span>Locked: Day {scene.locked_day}</span>
                 <button
                   onClick={() => onLockScene(scene.scene_id, null)}
                   title="Unlock scene (allow optimizer to move)"
-                  className="ml-0.5 text-amber-200 hover:text-white"
+                  className="ml-1 text-amber-200 hover:text-white font-bold"
                 >
-                  ✕
+                  Unlock ✕
                 </button>
               </div>
             ) : (
@@ -130,10 +125,10 @@ export const StripItem: React.FC<StripItemProps> = ({
                   }
                 }}
                 className="text-[10px] font-semibold bg-black/10 hover:bg-black/20 text-slate-900 rounded px-1.5 py-0.5 border border-black/15 cursor-pointer outline-none transition-colors"
-                title="Lock scene to day (or drag-and-drop to any day card)"
+                title="Move and lock this scene to a specific shoot day"
               >
                 <option value="" disabled>
-                  📌 Pin...
+                  Move to...
                 </option>
                 {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => (
                   <option key={d} value={d}>
