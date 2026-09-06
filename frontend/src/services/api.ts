@@ -173,4 +173,32 @@ export async function updateProductionSettings(settings: {
   return res.json();
 }
 
+export async function updateActorBlackout(
+  actorId: string,
+  blackoutDays: number[],
+  reSolve: boolean = false
+): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/actors/blackout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      actor_id: actorId,
+      blackout_days: blackoutDays,
+      re_solve: reSolve,
+    }),
+  });
+  if (!res.ok) throw new Error('Failed to update actor blackout days');
+  return res.json();
+}
+
+export async function restoreSchedule(solution: ScheduleSolution): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/schedule/restore`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(solution),
+  });
+  if (!res.ok) throw new Error('Failed to restore schedule');
+  return res.json();
+}
+
 

@@ -284,3 +284,38 @@ def test_reset_schedule_unlocks_and_restores():
     for day in data["days"]:
         for s in day["scenes"]:
             assert s.get("locked_day") is None
+
+def test_actor_blackout_and_dood_update():
+    # Reset to baseline
+    res = client.post("/api/schedule/reset")
+    assert res.status_code == 200
+
+    # Set Day 2 and Day 3 as blackout for ACTOR_MARCUS
+    blackout_res = client.post("/api/actors/blackout", json={
+        "actor_id": "ACTOR_MARCUS",
+        "blackout_days": [2, 3],
+        "re_solve": False
+    })
+    assert blackout_res.status_code == 200
+    sol = blackout_res.json()
+    
+    # Check DOOD matrix has blackout_days reflected
+    act_row = next((r for r in sol["dood_matrix"] if r["actor_id"] == "ACTOR_MARCUS"), None)
+    assert act_row is not None
+    assert 2 in act_row["blackout_days"]
+    assert 3 in act_row["blackout_days"]
+
+def test_restore_schedule_state():
+    res = client.post("/api/schedule/reset")
+    assert res.status_code == 200
+    sol = res.json()
+
+    # Move a scene to day 4
+    client.post("/api/production/move-scene", json={"scene_id": "SC_01", "target_day": 4})
+
+    # Restore the previous baseline solution
+    restore_res = client.post("/api/schedule/restore", json=sol)
+    assert restore_res.status_code == 200
+    restored = restore_res.json()
+    assert restored["solution_id"] == sol["solution_id"]
+

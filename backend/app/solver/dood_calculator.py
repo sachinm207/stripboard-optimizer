@@ -31,20 +31,27 @@ def calculate_dood_matrix(
         hold_days_count = 0
         work_days_count = len(worked_days)
 
+        blackouts = set(actor.blackout_days or [])
+
         if not worked_days:
-            day_codes = ["-"] * num_days
+            day_codes = ["U" if d in blackouts else "-" for d in range(1, num_days + 1)]
         else:
             first_day = min(worked_days)
             last_day = max(worked_days)
 
             for day in range(1, num_days + 1):
-                if day < first_day or day > last_day:
-                    day_codes.append("-")
-                elif work_by_day[day]:
-                    if day == last_day and len(worked_days) > 1:
+                if work_by_day[day]:
+                    if day in blackouts:
+                        # Scheduled to work on a blackout date!
+                        day_codes.append("!W")
+                    elif day == last_day and len(worked_days) > 1:
                         day_codes.append("F")
                     else:
                         day_codes.append("W")
+                elif day in blackouts:
+                    day_codes.append("U")
+                elif day < first_day or day > last_day:
+                    day_codes.append("-")
                 else:
                     # In between first and last work day, but not working
                     day_codes.append("H")
@@ -62,6 +69,7 @@ def calculate_dood_matrix(
                 hold_days=hold_days_count,
                 travel_days=0,
                 talent_cost=talent_cost,
+                blackout_days=list(actor.blackout_days or []),
             )
         )
 

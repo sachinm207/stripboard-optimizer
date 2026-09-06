@@ -1,5 +1,5 @@
 import React from 'react';
-import { Moon, Sun, MapPin, AlertCircle } from 'lucide-react';
+import { Moon, Sun, MapPin, AlertCircle, Undo2, Redo2, Zap } from 'lucide-react';
 import { DaySchedule } from '../types';
 import { StripItem } from './StripItem';
 
@@ -7,35 +7,99 @@ interface StripboardProps {
   days: DaySchedule[];
   onMoveScene?: (sceneId: string, targetDay: number) => void;
   onLockScene?: (sceneId: string, lockedDay: number | null) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onReOptimize?: () => void;
+  isSolving?: boolean;
 }
 
-export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLockScene }) => {
+export const Stripboard: React.FC<StripboardProps> = ({
+  days,
+  onMoveScene,
+  onLockScene,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
+  onReOptimize,
+  isSolving = false,
+}) => {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-          <span>SHOOTING STRIPBOARD CANVAS</span>
-          <span className="text-xs font-normal text-slate-400">({days.length} Shoot Days)</span>
-        </h2>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+            <span>SHOOTING STRIPBOARD CANVAS</span>
+            <span className="text-xs font-normal text-slate-400">({days.length} Shoot Days)</span>
+          </h2>
 
-        {/* Legend */}
-        <div className="hidden sm:flex items-center gap-3 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-amber-200 border border-amber-300" />
-            <span className="text-slate-300 text-[11px]">EXT DAY</span>
+          {/* Undo / Redo Toolbar */}
+          {(onUndo || onRedo) && (
+            <div className="flex items-center gap-1 bg-slate-900 border border-slate-700/80 p-0.5 rounded-lg shadow-sm">
+              <button
+                onClick={onUndo}
+                disabled={!canUndo || isSolving}
+                title="Undo last strip move or lock (Ctrl+Z)"
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                  canUndo && !isSolving
+                    ? 'bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white cursor-pointer shadow-xs'
+                    : 'text-slate-600 cursor-not-allowed opacity-40'
+                }`}
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Undo</span>
+              </button>
+              <button
+                onClick={onRedo}
+                disabled={!canRedo || isSolving}
+                title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                  canRedo && !isSolving
+                    ? 'bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white cursor-pointer shadow-xs'
+                    : 'text-slate-600 cursor-not-allowed opacity-40'
+                }`}
+              >
+                <Redo2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Redo</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Legend & Re-Optimize Button */}
+        <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-amber-200 border border-amber-300" />
+              <span className="text-slate-300 text-[11px]">EXT DAY</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-slate-100 border border-slate-300" />
+              <span className="text-slate-300 text-[11px]">INT DAY</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-violet-400 border border-violet-500" />
+              <span className="text-slate-300 text-[11px]">EXT NIGHT</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-blue-400 border border-blue-500" />
+              <span className="text-slate-300 text-[11px]">INT NIGHT</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-slate-100 border border-slate-300" />
-            <span className="text-slate-300 text-[11px]">INT DAY</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-violet-400 border border-violet-500" />
-            <span className="text-slate-300 text-[11px]">EXT NIGHT</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-blue-400 border border-blue-500" />
-            <span className="text-slate-300 text-[11px]">INT NIGHT</span>
-          </div>
+
+          {onReOptimize && (
+            <button
+              onClick={onReOptimize}
+              disabled={isSolving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition-all cursor-pointer shrink-0"
+              title="Optimize all remaining unlocked scenes around your manual locks and moves"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>{isSolving ? 'Optimizing...' : 'Re-Optimize Schedule'}</span>
+            </button>
+          )}
         </div>
       </div>
 

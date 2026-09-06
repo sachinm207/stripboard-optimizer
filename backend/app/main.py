@@ -3,7 +3,7 @@ import os
 import csv
 import io
 import re
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Dict
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -350,62 +350,7 @@ class LockSceneRequest(BaseModel):
     scene_id: str
     locked_day: Optional[int] = None
 
-@app.post("/api/production/lock-scene", response_model=ScheduleSolution)
-async def lock_scene_to_day(req: LockSceneRequest):
-    for s in STATE["scenes"]:
-        if s.scene_id == req.scene_id:
-            s.locked_day = req.locked_day
-            break
-
-    solver = StripboardSolver(
-        scenes=STATE["scenes"],
-        actors=STATE["actors"],
-        num_days=STATE["num_days"],
-        max_minutes_per_day=STATE["max_minutes_per_day"],
-        w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
-    )
-    solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
-    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
-
-class MoveSceneRequest(BaseModel):
-    scene_id: str
-    target_day: int
-
-@app.post("/api/production/move-scene", response_model=ScheduleSolution)
-async def move_scene_to_day(req: MoveSceneRequest):
-    if not STATE["current_solution"]:
-        raise HTTPException(status_code=400, detail="No schedule loaded to move scene in.")
-
-    # Find the target scene
-    target_scene = None
-    for s in STATE["scenes"]:
-        if s.scene_id == req.scene_id:
-            target_scene = s
-            # Ensure it is not locked when moved manually
-            target_scene.locked_day = None
-            break
-
-    if not target_scene:
-        raise HTTPException(status_code=404, detail="Scene not found.")
-
-    # Reconstruct scheduled_days_dict from current solution
-    scheduled_days_dict = {
-        d.day_number: [s for s in d.scenes if s.scene_id != req.scene_id]
-        for d in STATE["current_solution"].days
-    }
-    if req.target_day not in scheduled_days_dict:
-        scheduled_days_dict[req.target_day] = []
-
-    # Place target_scene without lock
-    target_scene.locked_day = None
-    scheduled_days_dict[req.target_day].append(target_scene)
-
-    # Recompute DaySchedules
+def _recompute_solution_metrics(scheduled_days_dict: Dict[int, List[Scene]]) -> ScheduleSolution:
     day_schedules: List[DaySchedule] = []
     total_moves = 0
     for d in range(1, STATE["num_days"] + 1):
@@ -428,11 +373,9 @@ async def move_scene_to_day(req: MoveSceneRequest):
             )
         )
 
-    # Recompute DOOD
     dood_rows = calculate_dood_matrix(STATE["actors"], scheduled_days_dict, STATE["num_days"])
     total_hold_days = sum(r.hold_days for r in dood_rows)
 
-    # Turnaround violations
     total_turnaround_violations = 0
     for d in range(len(day_schedules) - 1):
         if day_schedules[d].is_night and day_schedules[d + 1].is_day:
@@ -455,9 +398,144 @@ async def move_scene_to_day(req: MoveSceneRequest):
     STATE["current_solution"].days = day_schedules
     STATE["current_solution"].dood_matrix = dood_rows
     STATE["current_solution"].metrics = metrics
-
-    await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
     return STATE["current_solution"]
+
+@app.post("/api/production/lock-scene", response_model=ScheduleSolution)
+async def lock_scene_to_day(req: LockSceneRequest):
+    for s in STATE["scenes"]:
+        if s.scene_id == req.scene_id:
+            s.locked_day = req.locked_day
+            break
+
+    if STATE.get("current_solution"):
+        target_scene = next((s for s in STATE["scenes"] if s.scene_id == req.scene_id), None)
+        if target_scene:
+            target_scene.locked_day = req.locked_day
+
+        dest_day = req.locked_day
+        if dest_day is None:
+            # Finding previous day
+            for d in STATE["current_solution"].days:
+                if any(s.scene_id == req.scene_id for s in d.scenes):
+                    dest_day = d.day_number
+                    break
+            if dest_day is None:
+                dest_day = 1
+
+        scheduled_days_dict = {
+            d.day_number: [s for s in d.scenes if s.scene_id != req.scene_id]
+            for d in STATE["current_solution"].days
+        }
+        if dest_day not in scheduled_days_dict:
+            scheduled_days_dict[dest_day] = []
+        if target_scene:
+            scheduled_days_dict[dest_day].append(target_scene)
+
+        solution = _recompute_solution_metrics(scheduled_days_dict)
+        await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+        return solution
+
+    solver = StripboardSolver(
+        scenes=STATE["scenes"],
+        actors=STATE["actors"],
+        num_days=STATE["num_days"],
+        max_minutes_per_day=STATE["max_minutes_per_day"],
+        w_turnaround=STATE["w_turnaround"],
+        permit_lead_days=STATE["permit_lead_days"]
+    )
+    solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
+    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
+    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
+    STATE["current_solution"] = solution
+    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+    return solution
+
+class MoveSceneRequest(BaseModel):
+    scene_id: str
+    target_day: int
+
+@app.post("/api/production/move-scene", response_model=ScheduleSolution)
+async def move_scene_to_day(req: MoveSceneRequest):
+    if not STATE.get("current_solution"):
+        raise HTTPException(status_code=400, detail="No schedule loaded to move scene in.")
+
+    target_scene = None
+    for s in STATE["scenes"]:
+        if s.scene_id == req.scene_id:
+            target_scene = s
+            target_scene.locked_day = None
+            break
+
+    if not target_scene:
+        raise HTTPException(status_code=404, detail="Scene not found.")
+
+    scheduled_days_dict = {
+        d.day_number: [s for s in d.scenes if s.scene_id != req.scene_id]
+        for d in STATE["current_solution"].days
+    }
+    if req.target_day not in scheduled_days_dict:
+        scheduled_days_dict[req.target_day] = []
+
+    target_scene.locked_day = None
+    scheduled_days_dict[req.target_day].append(target_scene)
+
+    solution = _recompute_solution_metrics(scheduled_days_dict)
+    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+    return solution
+
+@app.post("/api/schedule/restore", response_model=ScheduleSolution)
+async def restore_schedule_state(solution: ScheduleSolution):
+    STATE["current_solution"] = solution
+    scene_lock_map = {}
+    for day in solution.days:
+        for s in day.scenes:
+            scene_lock_map[s.scene_id] = s.locked_day
+    for s in STATE["scenes"]:
+        if s.scene_id in scene_lock_map:
+            s.locked_day = scene_lock_map[s.scene_id]
+    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+    return solution
+
+class UpdateActorBlackoutRequest(BaseModel):
+    actor_id: str
+    blackout_days: List[int]
+    re_solve: bool = False
+
+@app.post("/api/actors/blackout", response_model=ScheduleSolution)
+async def update_actor_blackout(req: UpdateActorBlackoutRequest):
+    found = False
+    for a in STATE["actors"]:
+        if a.actor_id == req.actor_id:
+            a.blackout_days = req.blackout_days
+            found = True
+            break
+    if not found:
+        raise HTTPException(status_code=404, detail="Actor not found.")
+
+    await event_bus.publish("actor.contract.constraints", [a.model_dump() for a in STATE["actors"]])
+
+    if req.re_solve or not STATE.get("current_solution"):
+        solver = StripboardSolver(
+            scenes=STATE["scenes"],
+            actors=STATE["actors"],
+            num_days=STATE["num_days"],
+            max_minutes_per_day=STATE["max_minutes_per_day"],
+            w_turnaround=STATE["w_turnaround"],
+            permit_lead_days=STATE["permit_lead_days"]
+        )
+        solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
+        solution.production_id = STATE.get("production_id", "prod_neon_horizon")
+        STATE["current_solution"] = solution
+        await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+        return solution
+    else:
+        scheduled_days_dict = {
+            d.day_number: list(d.scenes)
+            for d in STATE["current_solution"].days
+        }
+        solution = _recompute_solution_metrics(scheduled_days_dict)
+        await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+        return solution
 
 @app.post("/api/schedule/clear")
 async def clear_production_schedule():

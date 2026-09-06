@@ -52,6 +52,7 @@ export interface ActorDOODRow {
   hold_days: number;
   travel_days: number;
   talent_cost: number;
+  blackout_days?: number[];
 }
 
 export interface ScheduleMetrics {

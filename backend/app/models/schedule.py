@@ -21,6 +21,7 @@ class ActorDOODRow(BaseModel):
     hold_days: int = 0
     travel_days: int = 0
     talent_cost: int = 0
+    blackout_days: List[int] = Field(default_factory=list, description="Shoot days where actor is unavailable")
 
 class ScheduleMetrics(BaseModel):
     objective_cost: int = 0
