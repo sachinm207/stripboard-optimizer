@@ -16,13 +16,17 @@ export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions }) =>
       <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3.5 shadow-lg relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition-all" />
         <div className="flex items-center justify-between text-xs text-emerald-400 font-medium mb-1">
-          <span>Est. Budget Saved</span>
+          <span>{disruptions.length > 0 ? 'Crisis Budget Saved' : 'Schedule Baseline'}</span>
           <TrendingUp className="w-4 h-4 text-emerald-400" />
         </div>
         <div className="text-xl lg:text-2xl font-black text-white tracking-tight">
-          ${metrics.cost_saved_vs_naive.toLocaleString()}
+          {disruptions.length > 0
+            ? `$${metrics.cost_saved_vs_naive.toLocaleString()}`
+            : 'Nominal Clean'}
         </div>
-        <p className="text-[11px] text-emerald-400/80 font-mono mt-0.5">vs. naive reschedule</p>
+        <p className="text-[11px] text-emerald-400/80 font-mono mt-0.5">
+          {disruptions.length > 0 ? 'saved vs. naive shutdown' : '0 active disruptions'}
+        </p>
       </div>
 
       {/* 2. Solver Latency */}
