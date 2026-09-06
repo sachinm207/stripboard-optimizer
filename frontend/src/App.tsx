@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { CostMeter } from './components/CostMeter';
 import { Stripboard } from './components/Stripboard';
-import { DoodMatrix } from './components/DoodMatrix';
+import { AvailabilityMatrix } from './components/AvailabilityMatrix';
 import { ChaosDrawer } from './components/ChaosDrawer';
 import { ProducerMemoModal } from './components/ProducerMemoModal';
 import { ImportModal } from './components/ImportModal';
@@ -23,9 +23,10 @@ import {
   solveSchedule,
   lockScene,
   moveScene,
-  restoreSchedule,
-  updateActorBlackout,
   clearSchedule,
+  updateConstraints,
+  toggleSoftLock,
+  clearSoftLocks,
 } from './services/api';
 import { Scene, Actor, ScheduleSolution, DisruptionAlert, KafkaStatus, UnionAudit } from './types';
 import {
@@ -60,8 +61,6 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'stripboard' | 'dood' | 'union' | 'kafka'>('stripboard');
   const [isSolving, setIsSolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<ScheduleSolution[]>([]);
-  const [future, setFuture] = useState<ScheduleSolution[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -129,29 +128,6 @@ export const App: React.FC = () => {
       }
     };
   }, []);
-
-  // Global Keyboard Shortcuts for Undo (Ctrl+Z / Cmd+Z) and Redo (Ctrl+Y / Shift+Ctrl+Z / Shift+Cmd+Z)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
-        if (e.shiftKey) {
-          e.preventDefault();
-          handleRedo();
-        } else {
-          e.preventDefault();
-          handleUndo();
-        }
-      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
-        e.preventDefault();
-        handleRedo();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [history, future, solution]);
 
   const handleInjectDisruption = async (disruptionItem: DisruptionAlert) => {
     setIsSolving(true);
@@ -230,42 +206,8 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleUndo = async () => {
-    if (history.length === 0 || !solution) return;
-    const previous = history[history.length - 1];
-    setHistory((h) => h.slice(0, h.length - 1));
-    setFuture((f) => [solution, ...f]);
-    setSolution(previous);
-    await restoreSchedule(previous).catch(console.error);
-    const [kStat, uAudit] = await Promise.all([
-      fetchKafkaStatus().catch(() => null),
-      fetchUnionAudit().catch(() => null),
-    ]);
-    setKafkaStatus(kStat);
-    setUnionAudit(uAudit);
-  };
-
-  const handleRedo = async () => {
-    if (future.length === 0 || !solution) return;
-    const next = future[0];
-    setFuture((f) => f.slice(1));
-    setHistory((h) => [...h, solution]);
-    setSolution(next);
-    await restoreSchedule(next).catch(console.error);
-    const [kStat, uAudit] = await Promise.all([
-      fetchKafkaStatus().catch(() => null),
-      fetchUnionAudit().catch(() => null),
-    ]);
-    setKafkaStatus(kStat);
-    setUnionAudit(uAudit);
-  };
-
   const handleSolveSchedule = async () => {
     setIsSolving(true);
-    if (solution) {
-      setHistory((prev) => [...prev, solution]);
-      setFuture([]);
-    }
     try {
       const updated = await solveSchedule();
       setSolution(updated);
@@ -285,10 +227,6 @@ export const App: React.FC = () => {
 
   const handleLockScene = async (sceneId: string, lockedDay: number | null) => {
     setIsSolving(true);
-    if (solution) {
-      setHistory((prev) => [...prev, solution]);
-      setFuture([]);
-    }
     try {
       const updated = await lockScene(sceneId, lockedDay);
       setSolution(updated);
@@ -308,10 +246,6 @@ export const App: React.FC = () => {
 
   const handleMoveScene = async (sceneId: string, targetDay: number) => {
     setIsSolving(true);
-    if (solution) {
-      setHistory((prev) => [...prev, solution]);
-      setFuture([]);
-    }
     try {
       const updated = await moveScene(sceneId, targetDay);
       setSolution(updated);
@@ -329,29 +263,6 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleUpdateActorBlackout = async (actorId: string, blackoutDays: number[]) => {
-    setIsSolving(true);
-    if (solution) {
-      setHistory((prev) => [...prev, solution]);
-      setFuture([]);
-    }
-    try {
-      const updated = await updateActorBlackout(actorId, blackoutDays, false);
-      setSolution(updated);
-      const [kStat, uAudit] = await Promise.all([
-        fetchKafkaStatus().catch(() => null),
-        fetchUnionAudit().catch(() => null),
-      ]);
-      setKafkaStatus(kStat);
-      setUnionAudit(uAudit);
-      setError(null);
-    } catch (err: any) {
-      setError('Failed to update actor blackout days: ' + err.message);
-    } finally {
-      setIsSolving(false);
-    }
-  };
-
   const handleClearSchedule = async () => {
     setIsSolving(true);
     try {
@@ -363,6 +274,67 @@ export const App: React.FC = () => {
       setError(null);
     } catch (err: any) {
       setError('Failed to clear schedule: ' + err.message);
+    } finally {
+      setIsSolving(false);
+    }
+  };
+
+  const handleSaveConstraints = async (constraints: {
+    actor_blackouts: Record<string, number[]>;
+    location_blackouts: Record<string, number[]>;
+    dark_days: number[];
+  }) => {
+    setIsSolving(true);
+    try {
+      const updated = await updateConstraints(constraints);
+      setSolution(updated);
+      const [kStat, uAudit] = await Promise.all([
+        fetchKafkaStatus().catch(() => null),
+        fetchUnionAudit().catch(() => null),
+      ]);
+      setKafkaStatus(kStat);
+      setUnionAudit(uAudit);
+      setError(null);
+    } catch (err: any) {
+      setError('Failed to update constraints: ' + err.message);
+    } finally {
+      setIsSolving(false);
+    }
+  };
+
+  const handleToggleSoftLock = async (entityId: string, day: number) => {
+    setIsSolving(true);
+    try {
+      const updated = await toggleSoftLock(entityId, day);
+      setSolution(updated);
+      const [kStat, uAudit] = await Promise.all([
+        fetchKafkaStatus().catch(() => null),
+        fetchUnionAudit().catch(() => null),
+      ]);
+      setKafkaStatus(kStat);
+      setUnionAudit(uAudit);
+      setError(null);
+    } catch (err: any) {
+      setError('Failed to toggle soft lock: ' + err.message);
+    } finally {
+      setIsSolving(false);
+    }
+  };
+
+  const handleClearSoftLocks = async () => {
+    setIsSolving(true);
+    try {
+      const updated = await clearSoftLocks();
+      setSolution(updated);
+      const [kStat, uAudit] = await Promise.all([
+        fetchKafkaStatus().catch(() => null),
+        fetchUnionAudit().catch(() => null),
+      ]);
+      setKafkaStatus(kStat);
+      setUnionAudit(uAudit);
+      setError(null);
+    } catch (err: any) {
+      setError('Failed to clear soft locks: ' + err.message);
     } finally {
       setIsSolving(false);
     }
@@ -566,7 +538,7 @@ export const App: React.FC = () => {
                 }`}
               >
                 <Calendar className="w-4 h-4" />
-                <span>Day-out-of-Days (DOOD)</span>
+                <span>Cast & Location DOOD Matrix</span>
               </button>
 
               <button
@@ -600,21 +572,22 @@ export const App: React.FC = () => {
                 days={solution.days}
                 onMoveScene={handleMoveScene}
                 onLockScene={handleLockScene}
-                canUndo={history.length > 0}
-                canRedo={future.length > 0}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-                onReOptimize={handleSolveSchedule}
-                isSolving={isSolving}
               />
             )}
 
             {activeTab === 'dood' && (
-              <DoodMatrix
+              <AvailabilityMatrix
                 doodMatrix={solution.dood_matrix}
+                actors={actors}
+                days={solution.days}
                 numDays={solution.days.length}
-                onUpdateActorBlackout={handleUpdateActorBlackout}
-                onReOptimize={handleSolveSchedule}
+                actorBlackouts={solution.actor_blackouts}
+                locationBlackouts={solution.location_blackouts}
+                darkDays={solution.dark_days}
+                softLocks={solution.soft_locks}
+                onSaveConstraints={handleSaveConstraints}
+                onToggleSoftLock={handleToggleSoftLock}
+                onClearSoftLocks={handleClearSoftLocks}
                 isSolving={isSolving}
               />
             )}

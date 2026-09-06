@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 from backend.app.models.actor import Actor
 from backend.app.models.scene import Scene
 from backend.app.models.schedule import ActorDOODRow
@@ -6,7 +6,9 @@ from backend.app.models.schedule import ActorDOODRow
 def calculate_dood_matrix(
     actors: List[Actor],
     scheduled_days: Dict[int, List[Scene]],
-    num_days: int
+    num_days: int,
+    actor_blackouts: Optional[Dict[str, List[int]]] = None,
+    dark_days: Optional[List[int]] = None,
 ) -> List[ActorDOODRow]:
     """
     Computes the Day-out-of-Days (DOOD) grid for each actor.
@@ -14,9 +16,12 @@ def calculate_dood_matrix(
       'W' = Work day
       'H' = Hold day (idle between first and last work day, incurs hold rate)
       'F' = Final work day (when more than 1 work day)
+      'X' = Blackout / Hiatus / Unavailable day
       '-' = Off / Not booked
     """
     dood_rows: List[ActorDOODRow] = []
+    actor_blackouts = actor_blackouts or {}
+    dark_days = dark_days or []
 
     for actor in actors:
         work_by_day = {}
@@ -30,26 +35,22 @@ def calculate_dood_matrix(
         day_codes: List[str] = []
         hold_days_count = 0
         work_days_count = len(worked_days)
-
-        blackouts = set(actor.blackout_days or [])
+        bl_days = set(actor_blackouts.get(actor.actor_id, [])) | set(dark_days)
 
         if not worked_days:
-            day_codes = ["U" if d in blackouts else "-" for d in range(1, num_days + 1)]
+            day_codes = ["X" if d in bl_days else "-" for d in range(1, num_days + 1)]
         else:
             first_day = min(worked_days)
             last_day = max(worked_days)
 
             for day in range(1, num_days + 1):
                 if work_by_day[day]:
-                    if day in blackouts:
-                        # Scheduled to work on a blackout date!
-                        day_codes.append("!W")
-                    elif day == last_day and len(worked_days) > 1:
+                    if day == last_day and len(worked_days) > 1:
                         day_codes.append("F")
                     else:
                         day_codes.append("W")
-                elif day in blackouts:
-                    day_codes.append("U")
+                elif day in bl_days:
+                    day_codes.append("X")
                 elif day < first_day or day > last_day:
                     day_codes.append("-")
                 else:
@@ -69,7 +70,6 @@ def calculate_dood_matrix(
                 hold_days=hold_days_count,
                 travel_days=0,
                 talent_cost=talent_cost,
-                blackout_days=list(actor.blackout_days or []),
             )
         )
 

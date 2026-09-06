@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from backend.app.models.scene import Scene
 from backend.app.models.disruption import DisruptionAlert
@@ -11,17 +11,18 @@ class DaySchedule(BaseModel):
     company_moves: int = 0
     is_night: bool = False
     is_day: bool = False
+    is_dark_day: bool = False
+    dark_day_reason: Optional[str] = None
 
 class ActorDOODRow(BaseModel):
     actor_id: str
     name: str
     character_name: str
-    day_codes: List[str] = Field(default_factory=list, description="List of codes per day: 'W' (Work), 'H' (Hold), 'T' (Travel), 'F' (Finish), '-' (Off)")
+    day_codes: List[str] = Field(default_factory=list, description="List of codes per day: 'W' (Work), 'H' (Hold), 'T' (Travel), 'F' (Finish), 'X' (Blackout), '-' (Off)")
     work_days: int = 0
     hold_days: int = 0
     travel_days: int = 0
     talent_cost: int = 0
-    blackout_days: List[int] = Field(default_factory=list, description="Shoot days where actor is unavailable")
 
 class ScheduleMetrics(BaseModel):
     objective_cost: int = 0
@@ -41,3 +42,7 @@ class ScheduleSolution(BaseModel):
     metrics: ScheduleMetrics = Field(default_factory=ScheduleMetrics)
     disruptions_applied: List[DisruptionAlert] = Field(default_factory=list)
     executive_memo: Optional[str] = None
+    actor_blackouts: Dict[str, List[int]] = Field(default_factory=dict)
+    location_blackouts: Dict[str, List[int]] = Field(default_factory=dict)
+    dark_days: List[int] = Field(default_factory=list)
+    soft_locks: Dict[str, List[int]] = Field(default_factory=dict)

@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from ortools.sat.python import cp_model
 from backend.app.models.scene import Scene, SceneSetting
 from backend.app.models.actor import Actor
-from backend.app.models.disruption import DisruptionAlert
+from backend.app.models.disruption import DisruptionAlert, DisruptionType
 from backend.app.models.schedule import (
     DaySchedule,
     ScheduleMetrics,
@@ -39,10 +39,18 @@ class StripboardSolver:
         self,
         disruptions: Optional[List[DisruptionAlert]] = None,
         time_limit_seconds: float = 5.0,
-        naive_cost: Optional[int] = None
+        naive_cost: Optional[int] = None,
+        actor_blackouts: Optional[Dict[str, List[int]]] = None,
+        location_blackouts: Optional[Dict[str, List[int]]] = None,
+        dark_days: Optional[List[int]] = None,
+        soft_locks: Optional[Dict[str, List[int]]] = None,
     ) -> ScheduleSolution:
         start_time = time.time()
         disruptions = disruptions or []
+        actor_blackouts = actor_blackouts or {}
+        location_blackouts = location_blackouts or {}
+        dark_days = list(dark_days or [])
+        soft_locks = soft_locks or {}
         model = cp_model.CpModel()
 
         D = list(range(1, self.num_days + 1))
@@ -68,8 +76,20 @@ class StripboardSolver:
                 <= self.max_minutes_per_day
             )
 
-        # 3. Disruption Constraints
+        # 2b. Complete Day Off / Dark Days (Tier 1 Pre-Planned Hiatus / Festival)
+        for dd in dark_days:
+            if dd in D:
+                for s in scene_ids:
+                    model.Add(X[s, dd] == 0)
+
+        # 3. Disruption Constraints (Tier 2 Sudden Operational Chaos)
         for alert in disruptions:
+            if alert.disruption_type in (DisruptionType.DAY_SHUTDOWN, "DAY_SHUTDOWN"):
+                for dd in alert.affected_shoot_days:
+                    if dd in D:
+                        for s in scene_ids:
+                            model.Add(X[s, dd] == 0)
+
             if alert.affected_actor_id and alert.affected_shoot_days:
                 for s in self.scenes:
                     if alert.affected_actor_id in s.cast_ids:
@@ -84,7 +104,23 @@ class StripboardSolver:
                             if d in D:
                                 model.Add(X[s.scene_id, d] == 0)
 
-        # Static actor blackout days
+        # 3b. Tier 1 Pre-Planned Actor Blackout Matrix Constraints
+        for act_id, b_days in actor_blackouts.items():
+            for d in b_days:
+                if d in D:
+                    for s in self.scenes:
+                        if act_id in s.cast_ids:
+                            model.Add(X[s.scene_id, d] == 0)
+
+        # 3c. Tier 1 Pre-Planned Location Blackout Matrix Constraints
+        for loc_name, b_days in location_blackouts.items():
+            for d in b_days:
+                if d in D:
+                    for s in self.scenes:
+                        if s.location == loc_name:
+                            model.Add(X[s.scene_id, d] == 0)
+
+        # Static actor contract blackout days
         for a in self.actors:
             for d in a.blackout_days:
                 if d in D:
@@ -99,7 +135,7 @@ class StripboardSolver:
                     if d not in s.permit_days:
                         model.Add(X[s.scene_id, d] == 0)
 
-        # 3b. Manual Pinning / Lock Day Constraint (Human AD Manual Override)
+        # 3d. Manual Pinning / Lock Day Constraint (Human AD Manual Override)
         for s in self.scenes:
             if s.locked_day is not None and s.locked_day in D:
                 model.Add(X[s.scene_id, s.locked_day] == 1)
@@ -207,11 +243,27 @@ class StripboardSolver:
                 model.AddMultiplicationEquality(turn_violation, [is_night_d, is_day_next])
                 TurnaroundVars.append(turn_violation)
 
+        # Tier 3: Exploratory What-If Soft Locks Formulation
+        SoftLockMissVars = []
+        for entity_id, target_days in soft_locks.items():
+            for td in target_days:
+                if td in D:
+                    if entity_id in actor_ids:
+                        miss_var = model.NewBoolVar(f"SoftLockMiss_Actor_{entity_id}_{td}")
+                        model.Add(miss_var == 1 - W_act[entity_id, td])
+                        SoftLockMissVars.append(miss_var)
+                    elif entity_id in locations:
+                        miss_var = model.NewBoolVar(f"SoftLockMiss_Loc_{entity_id}_{td}")
+                        model.Add(miss_var == 1 - LocUsed[entity_id, td])
+                        SoftLockMissVars.append(miss_var)
+
         # Multi-Objective Function
+        w_soft = 5000
         model.Minimize(
             self.w_hold * sum(total_hold_vars) +
             self.w_move * sum(MoveVars) +
-            self.w_turnaround * sum(TurnaroundVars)
+            self.w_turnaround * sum(TurnaroundVars) +
+            w_soft * sum(SoftLockMissVars)
         )
 
         # Solve
@@ -234,6 +286,16 @@ class StripboardSolver:
             # Build DaySchedule objects
             day_schedules: List[DaySchedule] = []
             total_moves = 0
+
+            # Aggregate all dark days (planned + sudden)
+            shutdown_days = set(dark_days)
+            shutdown_reasons: Dict[int, str] = {d: "Scheduled Hiatus / Festival" for d in dark_days}
+            for alert in disruptions:
+                if alert.disruption_type in (DisruptionType.DAY_SHUTDOWN, "DAY_SHUTDOWN"):
+                    for d in alert.affected_shoot_days:
+                        shutdown_days.add(d)
+                        shutdown_reasons[d] = alert.reason
+
             for d in D:
                 scenes_on_day = scheduled_days_dict[d]
                 total_duration = sum(sc.est_shoot_minutes for sc in scenes_on_day)
@@ -243,6 +305,7 @@ class StripboardSolver:
 
                 has_night = any("NIGHT" in sc.setting.value for sc in scenes_on_day)
                 has_day = any("DAY" in sc.setting.value for sc in scenes_on_day)
+                is_dark = (d in shutdown_days)
 
                 day_schedules.append(
                     DaySchedule(
@@ -253,11 +316,19 @@ class StripboardSolver:
                         company_moves=day_moves,
                         is_night=has_night,
                         is_day=has_day,
+                        is_dark_day=is_dark,
+                        dark_day_reason=shutdown_reasons.get(d) if is_dark else None,
                     )
                 )
 
             # Calculate DOOD
-            dood_rows = calculate_dood_matrix(self.actors, scheduled_days_dict, self.num_days)
+            dood_rows = calculate_dood_matrix(
+                self.actors,
+                scheduled_days_dict,
+                self.num_days,
+                actor_blackouts=actor_blackouts,
+                dark_days=list(shutdown_days)
+            )
             total_hold_days = sum(r.hold_days for r in dood_rows)
 
             # Turnaround violations
@@ -293,6 +364,10 @@ class StripboardSolver:
                 dood_matrix=dood_rows,
                 metrics=metrics,
                 disruptions_applied=disruptions,
+                actor_blackouts=actor_blackouts,
+                location_blackouts=location_blackouts,
+                dark_days=dark_days,
+                soft_locks=soft_locks,
             )
             return solution
         else:

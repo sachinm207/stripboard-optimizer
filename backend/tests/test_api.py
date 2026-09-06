@@ -285,37 +285,76 @@ def test_reset_schedule_unlocks_and_restores():
         for s in day["scenes"]:
             assert s.get("locked_day") is None
 
-def test_actor_blackout_and_dood_update():
-    # Reset to baseline
-    res = client.post("/api/schedule/reset")
-    assert res.status_code == 200
+def test_constraints_get_and_post():
+    client.post("/api/schedule/reset")
+    get_res = client.get("/api/production/constraints")
+    assert get_res.status_code == 200
+    c_data = get_res.json()
+    assert "actor_blackouts" in c_data
+    assert "location_blackouts" in c_data
+    assert "dark_days" in c_data
 
-    # Set Day 2 and Day 3 as blackout for ACTOR_MARCUS
-    blackout_res = client.post("/api/actors/blackout", json={
-        "actor_id": "ACTOR_MARCUS",
-        "blackout_days": [2, 3],
-        "re_solve": False
+    # Update Tier 1 hard constraints: Sarah unavailable Day 2, Warehouse closed Day 1
+    post_res = client.post("/api/production/constraints", json={
+        "actor_blackouts": {"ACTOR_SARAH": [2]},
+        "location_blackouts": {"Warehouse": [1]},
+        "dark_days": []
     })
-    assert blackout_res.status_code == 200
-    sol = blackout_res.json()
-    
-    # Check DOOD matrix has blackout_days reflected
-    act_row = next((r for r in sol["dood_matrix"] if r["actor_id"] == "ACTOR_MARCUS"), None)
-    assert act_row is not None
-    assert 2 in act_row["blackout_days"]
-    assert 3 in act_row["blackout_days"]
+    assert post_res.status_code == 200
+    sol = post_res.json()
+    assert sol["status"] in ("OPTIMAL", "FEASIBLE")
 
-def test_restore_schedule_state():
-    res = client.post("/api/schedule/reset")
+    # Verify Sarah is NOT scheduled on Day 2
+    day2_scenes = [s for d in sol["days"] if d["day_number"] == 2 for s in d["scenes"]]
+    for s in day2_scenes:
+        assert "ACTOR_SARAH" not in s["cast_ids"]
+
+def test_planned_dark_day_cascade():
+    client.post("/api/schedule/reset")
+    # Mark Day 3 as Dark Day / Festival
+    res = client.post("/api/production/constraints", json={
+        "dark_days": [3]
+    })
     assert res.status_code == 200
     sol = res.json()
 
-    # Move a scene to day 4
-    client.post("/api/production/move-scene", json={"scene_id": "SC_01", "target_day": 4})
+    day3 = next(d for d in sol["days"] if d["day_number"] == 3)
+    assert day3["is_dark_day"] is True
+    assert len(day3["scenes"]) == 0
+    assert day3["total_duration_minutes"] == 0
 
-    # Restore the previous baseline solution
-    restore_res = client.post("/api/schedule/restore", json=sol)
-    assert restore_res.status_code == 200
-    restored = restore_res.json()
-    assert restored["solution_id"] == sol["solution_id"]
+def test_sudden_emergency_day_shutdown():
+    client.post("/api/schedule/reset")
+    # Inject sudden DAY_SHUTDOWN on Day 2 via Chaos
+    alert_res = client.post("/api/schedule/disrupt", json={
+        "alert_id": "sudden_curfew_01",
+        "production_id": "prod_neon_horizon",
+        "disruption_type": "DAY_SHUTDOWN",
+        "severity": "CRITICAL",
+        "affected_shoot_days": [2],
+        "reason": "Emergency flood curfew"
+    })
+    assert alert_res.status_code == 200
+    sol = alert_res.json()
+
+    day2 = next(d for d in sol["days"] if d["day_number"] == 2)
+    assert day2["is_dark_day"] is True
+    assert len(day2["scenes"]) == 0
+
+def test_soft_locks_toggle_and_clear():
+    client.post("/api/schedule/reset")
+    # Toggle soft lock for ACTOR_SARAH on Day 1
+    toggle_res = client.post("/api/production/toggle-soft-lock", json={
+        "entity_id": "ACTOR_SARAH",
+        "day": 1
+    })
+    assert toggle_res.status_code == 200
+    sol = toggle_res.json()
+    assert 1 in sol["soft_locks"].get("ACTOR_SARAH", [])
+
+    # Clear soft locks
+    clear_res = client.post("/api/production/clear-soft-locks")
+    assert clear_res.status_code == 200
+    sol_cleared = clear_res.json()
+    assert len(sol_cleared.get("soft_locks", {})) == 0
 

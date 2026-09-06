@@ -1,4 +1,4 @@
-import { Scene, Actor, ScheduleSolution, DisruptionAlert, KafkaStatus, UnionAudit } from '../types';
+import { Scene, Actor, ScheduleSolution, DisruptionAlert, KafkaStatus, UnionAudit, ProductionConstraints } from '../types';
 
 const API_BASE = '/api';
 
@@ -173,31 +173,47 @@ export async function updateProductionSettings(settings: {
   return res.json();
 }
 
-export async function updateActorBlackout(
-  actorId: string,
-  blackoutDays: number[],
-  reSolve: boolean = false
-): Promise<ScheduleSolution> {
-  const res = await fetch(`${API_BASE}/actors/blackout`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      actor_id: actorId,
-      blackout_days: blackoutDays,
-      re_solve: reSolve,
-    }),
-  });
-  if (!res.ok) throw new Error('Failed to update actor blackout days');
+export async function fetchConstraints(): Promise<ProductionConstraints> {
+  const res = await fetch(`${API_BASE}/production/constraints`);
+  if (!res.ok) throw new Error('Failed to fetch constraints');
   return res.json();
 }
 
-export async function restoreSchedule(solution: ScheduleSolution): Promise<ScheduleSolution> {
-  const res = await fetch(`${API_BASE}/schedule/restore`, {
+export async function updateConstraints(constraints: {
+  actor_blackouts?: Record<string, number[]>;
+  location_blackouts?: Record<string, number[]>;
+  dark_days?: number[];
+  soft_locks?: Record<string, number[]>;
+}): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/constraints`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(solution),
+    body: JSON.stringify(constraints),
   });
-  if (!res.ok) throw new Error('Failed to restore schedule');
+  if (!res.ok) throw new Error('Failed to update constraints');
+  return res.json();
+}
+
+export async function toggleSoftLock(
+  entityId: string,
+  day: number,
+  active?: boolean
+): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/toggle-soft-lock`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entity_id: entityId, day, active }),
+  });
+  if (!res.ok) throw new Error('Failed to toggle soft lock');
+  return res.json();
+}
+
+export async function clearSoftLocks(): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/clear-soft-locks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error('Failed to clear soft locks');
   return res.json();
 }
 

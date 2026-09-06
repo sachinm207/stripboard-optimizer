@@ -41,6 +41,8 @@ export interface DaySchedule {
   company_moves: number;
   is_night: boolean;
   is_day: boolean;
+  is_dark_day?: boolean;
+  dark_day_reason?: string;
 }
 
 export interface ActorDOODRow {
@@ -52,7 +54,6 @@ export interface ActorDOODRow {
   hold_days: number;
   travel_days: number;
   talent_cost: number;
-  blackout_days?: number[];
 }
 
 export interface ScheduleMetrics {
@@ -65,6 +66,13 @@ export interface ScheduleMetrics {
   union_compliance_rate: number;
 }
 
+export interface ProductionConstraints {
+  actor_blackouts: Record<string, number[]>;
+  location_blackouts: Record<string, number[]>;
+  dark_days: number[];
+  soft_locks: Record<string, number[]>;
+}
+
 export interface ScheduleSolution {
   solution_id: string;
   production_id: string;
@@ -74,6 +82,10 @@ export interface ScheduleSolution {
   metrics: ScheduleMetrics;
   disruptions_applied: DisruptionAlert[];
   executive_memo?: string;
+  actor_blackouts?: Record<string, number[]>;
+  location_blackouts?: Record<string, number[]>;
+  dark_days?: number[];
+  soft_locks?: Record<string, number[]>;
 }
 
 export interface UnionViolation {

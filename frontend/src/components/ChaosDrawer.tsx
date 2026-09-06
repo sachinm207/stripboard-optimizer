@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Flame, AlertTriangle, ShieldAlert, CloudRain, Ban, Activity, Plus, Trash2, Zap } from 'lucide-react';
+import { X, Flame, AlertTriangle, ShieldAlert, CloudRain, Ban, Activity, Plus, Trash2, Zap, Moon } from 'lucide-react';
 import { DisruptionAlert, Actor, Scene } from '../types';
 
 interface ChaosDrawerProps {
@@ -129,6 +129,15 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
         affected_shoot_days: [5],
         reason: 'Det. Marcus Cole required for emergency Broadway commitment on Day 5',
       });
+    } else if (presetType === 'EMERGENCY_DAY_SHUTDOWN') {
+      onInject({
+        alert_id: `alert_shutdown_${Date.now()}`,
+        production_id: 'prod_neon_horizon',
+        disruption_type: 'DAY_SHUTDOWN',
+        severity: 'CRITICAL',
+        affected_shoot_days: [3],
+        reason: 'Emergency Force Majeure: Citywide flash flood warning and municipal curfew (Day 3 shut down)',
+      });
     }
   };
 
@@ -164,7 +173,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             <button
               onClick={() => triggerPreset('SARAH_COVID')}
               disabled={isSolving}
-              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-rose-500/30 hover:border-rose-500/60 transition-all flex items-start gap-3 group"
+              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-rose-500/30 hover:border-rose-500/60 transition-all flex items-start gap-3 group cursor-pointer"
             >
               <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
               <div>
@@ -176,7 +185,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             <button
               onClick={() => triggerPreset('WAREHOUSE_FLOOD')}
               disabled={isSolving}
-              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-sky-500/30 hover:border-sky-500/60 transition-all flex items-start gap-3 group"
+              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-sky-500/30 hover:border-sky-500/60 transition-all flex items-start gap-3 group cursor-pointer"
             >
               <CloudRain className="w-5 h-5 text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
               <div>
@@ -188,12 +197,24 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             <button
               onClick={() => triggerPreset('PERMIT_REVOCATION')}
               disabled={isSolving}
-              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-amber-500/30 hover:border-amber-500/60 transition-all flex items-start gap-3 group"
+              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-amber-500/30 hover:border-amber-500/60 transition-all flex items-start gap-3 group cursor-pointer"
             >
               <Ban className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
               <div>
                 <div className="font-semibold text-xs text-white">Precinct Permit Revoked</div>
                 <p className="text-[11px] text-slate-400 mt-0.5">Police Precinct filming prohibited on Day 4</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => triggerPreset('EMERGENCY_DAY_SHUTDOWN')}
+              disabled={isSolving}
+              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-indigo-500/30 hover:border-indigo-500/60 transition-all flex items-start gap-3 group cursor-pointer"
+            >
+              <Moon className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+              <div>
+                <div className="font-semibold text-xs text-white">Sudden Day Shutdown (Force Majeure)</div>
+                <p className="text-[11px] text-slate-400 mt-0.5">Day 3 closed by emergency city curfew</p>
               </div>
             </button>
           </div>
@@ -210,12 +231,13 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
               <select
                 value={disruptionType}
                 onChange={(e) => setDisruptionType(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
               >
                 <option value="ACTOR_ILLNESS">Actor Illness / Quarantine</option>
                 <option value="WEATHER_EVENT">Extreme Weather Event</option>
                 <option value="LOCATION_UNAVAILABLE">Location Unavailable</option>
                 <option value="PERMIT_REVOCATION">Permit Revocation</option>
+                <option value="DAY_SHUTDOWN">Force Majeure / Emergency Day Shutdown</option>
               </select>
             </div>
 
@@ -225,7 +247,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                 <select
                   value={selectedActor}
                   onChange={(e) => setSelectedActor(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
                 >
                   {actors.map((a) => (
                     <option key={a.actor_id} value={a.actor_id}>
@@ -234,13 +256,18 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                   ))}
                 </select>
               </div>
+            ) : disruptionType === 'DAY_SHUTDOWN' ? (
+              <div className="p-2.5 rounded bg-indigo-950/40 border border-indigo-800/50 text-[11px] text-indigo-200">
+                <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />
+                Entire shoot day will be evacuated and declared a zero-shooting hiatus.
+              </div>
             ) : (
               <div>
                 <label className="block text-[11px] text-slate-400 font-medium mb-1">Affected Location</label>
                 <select
                   value={selectedLocation}
                   onChange={(e) => setSelectedLocation(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
                 >
                   {locations.map((loc) => (
                     <option key={loc} value={loc}>

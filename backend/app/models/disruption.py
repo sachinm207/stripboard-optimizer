@@ -7,6 +7,7 @@ class DisruptionType(str, Enum):
     LOCATION_UNAVAILABLE = "LOCATION_UNAVAILABLE"
     WEATHER_EVENT = "WEATHER_EVENT"
     PERMIT_REVOCATION = "PERMIT_REVOCATION"
+    DAY_SHUTDOWN = "DAY_SHUTDOWN"
 
 class DisruptionAlert(BaseModel):
     alert_id: str

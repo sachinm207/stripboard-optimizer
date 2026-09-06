@@ -35,7 +35,38 @@ STATE = {
     "naive_cost": 0,
     "current_solution": None,
     "active_disruptions": [],
+    "actor_blackouts": {},
+    "location_blackouts": {},
+    "dark_days": [],
+    "soft_locks": {},
 }
+
+def run_solver(disruptions=None, naive_cost=None) -> ScheduleSolution:
+    if disruptions is None:
+        disruptions = STATE.get("active_disruptions", [])
+    if naive_cost is None:
+        naive_cost = STATE.get("naive_cost", None)
+
+    solver = StripboardSolver(
+        scenes=STATE["scenes"],
+        actors=STATE["actors"],
+        num_days=STATE["num_days"],
+        max_minutes_per_day=STATE["max_minutes_per_day"],
+        w_hold=STATE.get("w_hold", 2000),
+        w_move=STATE.get("w_move", 15000),
+        w_turnaround=STATE["w_turnaround"],
+        permit_lead_days=STATE["permit_lead_days"]
+    )
+    solution = solver.solve(
+        disruptions=disruptions,
+        naive_cost=naive_cost,
+        actor_blackouts=STATE.get("actor_blackouts", {}),
+        location_blackouts=STATE.get("location_blackouts", {}),
+        dark_days=STATE.get("dark_days", []),
+        soft_locks=STATE.get("soft_locks", {})
+    )
+    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
+    return solution
 
 memo_agent = ExecutiveMemoAgent()
 union_agent = UnionComplianceAgent()
@@ -350,90 +381,12 @@ class LockSceneRequest(BaseModel):
     scene_id: str
     locked_day: Optional[int] = None
 
-def _recompute_solution_metrics(scheduled_days_dict: Dict[int, List[Scene]]) -> ScheduleSolution:
-    day_schedules: List[DaySchedule] = []
-    total_moves = 0
-    for d in range(1, STATE["num_days"] + 1):
-        scs = scheduled_days_dict.get(d, [])
-        tot_duration = sum(sc.est_shoot_minutes for sc in scs)
-        day_locs = sorted(list({sc.location for sc in scs}))
-        day_moves = max(0, len(day_locs) - 1)
-        total_moves += day_moves
-        has_night = any("NIGHT" in sc.setting.value for sc in scs)
-        has_day = any("DAY" in sc.setting.value for sc in scs)
-        day_schedules.append(
-            DaySchedule(
-                day_number=d,
-                scenes=scs,
-                total_duration_minutes=tot_duration,
-                locations=day_locs,
-                company_moves=day_moves,
-                is_night=has_night,
-                is_day=has_day,
-            )
-        )
-
-    dood_rows = calculate_dood_matrix(STATE["actors"], scheduled_days_dict, STATE["num_days"])
-    total_hold_days = sum(r.hold_days for r in dood_rows)
-
-    total_turnaround_violations = 0
-    for d in range(len(day_schedules) - 1):
-        if day_schedules[d].is_night and day_schedules[d + 1].is_day:
-            total_turnaround_violations += 1
-
-    current_cost = (total_hold_days * STATE["w_hold"]) + (total_moves * STATE["w_move"]) + (total_turnaround_violations * STATE["w_turnaround"])
-    naive_baseline = STATE.get("naive_cost") or current_cost
-    cost_saved = max(0, naive_baseline - current_cost)
-
-    metrics = ScheduleMetrics(
-        objective_cost=current_cost,
-        cost_saved_vs_naive=cost_saved,
-        total_company_moves=total_moves,
-        total_hold_days=total_hold_days,
-        total_turnaround_violations=total_turnaround_violations,
-        solver_runtime_ms=0,
-        union_compliance_rate=1.0 if total_turnaround_violations == 0 else max(0.0, 1.0 - (total_turnaround_violations * 0.25)),
-    )
-
-    STATE["current_solution"].days = day_schedules
-    STATE["current_solution"].dood_matrix = dood_rows
-    STATE["current_solution"].metrics = metrics
-    return STATE["current_solution"]
-
 @app.post("/api/production/lock-scene", response_model=ScheduleSolution)
 async def lock_scene_to_day(req: LockSceneRequest):
     for s in STATE["scenes"]:
         if s.scene_id == req.scene_id:
             s.locked_day = req.locked_day
             break
-
-    if STATE.get("current_solution"):
-        target_scene = next((s for s in STATE["scenes"] if s.scene_id == req.scene_id), None)
-        if target_scene:
-            target_scene.locked_day = req.locked_day
-
-        dest_day = req.locked_day
-        if dest_day is None:
-            # Finding previous day
-            for d in STATE["current_solution"].days:
-                if any(s.scene_id == req.scene_id for s in d.scenes):
-                    dest_day = d.day_number
-                    break
-            if dest_day is None:
-                dest_day = 1
-
-        scheduled_days_dict = {
-            d.day_number: [s for s in d.scenes if s.scene_id != req.scene_id]
-            for d in STATE["current_solution"].days
-        }
-        if dest_day not in scheduled_days_dict:
-            scheduled_days_dict[dest_day] = []
-        if target_scene:
-            scheduled_days_dict[dest_day].append(target_scene)
-
-        solution = _recompute_solution_metrics(scheduled_days_dict)
-        await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-        return solution
 
     solver = StripboardSolver(
         scenes=STATE["scenes"],
@@ -456,19 +409,22 @@ class MoveSceneRequest(BaseModel):
 
 @app.post("/api/production/move-scene", response_model=ScheduleSolution)
 async def move_scene_to_day(req: MoveSceneRequest):
-    if not STATE.get("current_solution"):
+    if not STATE["current_solution"]:
         raise HTTPException(status_code=400, detail="No schedule loaded to move scene in.")
 
+    # Find the target scene
     target_scene = None
     for s in STATE["scenes"]:
         if s.scene_id == req.scene_id:
             target_scene = s
+            # Ensure it is not locked when moved manually
             target_scene.locked_day = None
             break
 
     if not target_scene:
         raise HTTPException(status_code=404, detail="Scene not found.")
 
+    # Reconstruct scheduled_days_dict from current solution
     scheduled_days_dict = {
         d.day_number: [s for s in d.scenes if s.scene_id != req.scene_id]
         for d in STATE["current_solution"].days
@@ -476,66 +432,63 @@ async def move_scene_to_day(req: MoveSceneRequest):
     if req.target_day not in scheduled_days_dict:
         scheduled_days_dict[req.target_day] = []
 
+    # Place target_scene without lock
     target_scene.locked_day = None
     scheduled_days_dict[req.target_day].append(target_scene)
 
-    solution = _recompute_solution_metrics(scheduled_days_dict)
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
-
-@app.post("/api/schedule/restore", response_model=ScheduleSolution)
-async def restore_schedule_state(solution: ScheduleSolution):
-    STATE["current_solution"] = solution
-    scene_lock_map = {}
-    for day in solution.days:
-        for s in day.scenes:
-            scene_lock_map[s.scene_id] = s.locked_day
-    for s in STATE["scenes"]:
-        if s.scene_id in scene_lock_map:
-            s.locked_day = scene_lock_map[s.scene_id]
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
-
-class UpdateActorBlackoutRequest(BaseModel):
-    actor_id: str
-    blackout_days: List[int]
-    re_solve: bool = False
-
-@app.post("/api/actors/blackout", response_model=ScheduleSolution)
-async def update_actor_blackout(req: UpdateActorBlackoutRequest):
-    found = False
-    for a in STATE["actors"]:
-        if a.actor_id == req.actor_id:
-            a.blackout_days = req.blackout_days
-            found = True
-            break
-    if not found:
-        raise HTTPException(status_code=404, detail="Actor not found.")
-
-    await event_bus.publish("actor.contract.constraints", [a.model_dump() for a in STATE["actors"]])
-
-    if req.re_solve or not STATE.get("current_solution"):
-        solver = StripboardSolver(
-            scenes=STATE["scenes"],
-            actors=STATE["actors"],
-            num_days=STATE["num_days"],
-            max_minutes_per_day=STATE["max_minutes_per_day"],
-            w_turnaround=STATE["w_turnaround"],
-            permit_lead_days=STATE["permit_lead_days"]
+    # Recompute DaySchedules
+    day_schedules: List[DaySchedule] = []
+    total_moves = 0
+    for d in range(1, STATE["num_days"] + 1):
+        scs = scheduled_days_dict.get(d, [])
+        tot_duration = sum(sc.est_shoot_minutes for sc in scs)
+        day_locs = sorted(list({sc.location for sc in scs}))
+        day_moves = max(0, len(day_locs) - 1)
+        total_moves += day_moves
+        has_night = any("NIGHT" in sc.setting.value for sc in scs)
+        has_day = any("DAY" in sc.setting.value for sc in scs)
+        day_schedules.append(
+            DaySchedule(
+                day_number=d,
+                scenes=scs,
+                total_duration_minutes=tot_duration,
+                locations=day_locs,
+                company_moves=day_moves,
+                is_night=has_night,
+                is_day=has_day,
+            )
         )
-        solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
-        solution.production_id = STATE.get("production_id", "prod_neon_horizon")
-        STATE["current_solution"] = solution
-        await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-        return solution
-    else:
-        scheduled_days_dict = {
-            d.day_number: list(d.scenes)
-            for d in STATE["current_solution"].days
-        }
-        solution = _recompute_solution_metrics(scheduled_days_dict)
-        await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-        return solution
+
+    # Recompute DOOD
+    dood_rows = calculate_dood_matrix(STATE["actors"], scheduled_days_dict, STATE["num_days"])
+    total_hold_days = sum(r.hold_days for r in dood_rows)
+
+    # Turnaround violations
+    total_turnaround_violations = 0
+    for d in range(len(day_schedules) - 1):
+        if day_schedules[d].is_night and day_schedules[d + 1].is_day:
+            total_turnaround_violations += 1
+
+    current_cost = (total_hold_days * STATE["w_hold"]) + (total_moves * STATE["w_move"]) + (total_turnaround_violations * STATE["w_turnaround"])
+    naive_baseline = STATE.get("naive_cost") or current_cost
+    cost_saved = max(0, naive_baseline - current_cost)
+
+    metrics = ScheduleMetrics(
+        objective_cost=current_cost,
+        cost_saved_vs_naive=cost_saved,
+        total_company_moves=total_moves,
+        total_hold_days=total_hold_days,
+        total_turnaround_violations=total_turnaround_violations,
+        solver_runtime_ms=0,
+        union_compliance_rate=1.0 if total_turnaround_violations == 0 else max(0.0, 1.0 - (total_turnaround_violations * 0.25)),
+    )
+
+    STATE["current_solution"].days = day_schedules
+    STATE["current_solution"].dood_matrix = dood_rows
+    STATE["current_solution"].metrics = metrics
+
+    await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+    return STATE["current_solution"]
 
 @app.post("/api/schedule/clear")
 async def clear_production_schedule():
@@ -571,16 +524,77 @@ async def update_production_settings(req: SettingsUpdateRequest):
     if req.max_minutes_per_day is not None:
         STATE["max_minutes_per_day"] = req.max_minutes_per_day
 
-    solver = StripboardSolver(
-        scenes=STATE["scenes"],
-        actors=STATE["actors"],
-        num_days=STATE["num_days"],
-        max_minutes_per_day=STATE["max_minutes_per_day"],
-        w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
-    )
-    solution = solver.solve(disruptions=STATE["active_disruptions"])
-    solution.production_id = STATE["production_id"]
+    solution = run_solver()
+    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
+    STATE["current_solution"] = solution
+    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+    return solution
+
+class UpdateConstraintsRequest(BaseModel):
+    actor_blackouts: Optional[Dict[str, List[int]]] = None
+    location_blackouts: Optional[Dict[str, List[int]]] = None
+    dark_days: Optional[List[int]] = None
+    soft_locks: Optional[Dict[str, List[int]]] = None
+
+@app.get("/api/production/constraints")
+def get_production_constraints():
+    return {
+        "actor_blackouts": STATE.get("actor_blackouts", {}),
+        "location_blackouts": STATE.get("location_blackouts", {}),
+        "dark_days": STATE.get("dark_days", []),
+        "soft_locks": STATE.get("soft_locks", {}),
+    }
+
+@app.post("/api/production/constraints", response_model=ScheduleSolution)
+async def update_production_constraints(req: UpdateConstraintsRequest):
+    if req.actor_blackouts is not None:
+        STATE["actor_blackouts"] = req.actor_blackouts
+    if req.location_blackouts is not None:
+        STATE["location_blackouts"] = req.location_blackouts
+    if req.dark_days is not None:
+        STATE["dark_days"] = req.dark_days
+    if req.soft_locks is not None:
+        STATE["soft_locks"] = req.soft_locks
+
+    solution = run_solver()
+    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
+    STATE["current_solution"] = solution
+    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+    return solution
+
+class ToggleSoftLockRequest(BaseModel):
+    entity_id: str
+    day: int
+    active: Optional[bool] = None
+
+@app.post("/api/production/toggle-soft-lock", response_model=ScheduleSolution)
+async def toggle_soft_lock(req: ToggleSoftLockRequest):
+    soft = STATE.setdefault("soft_locks", {})
+    entity_days = soft.setdefault(req.entity_id, [])
+    
+    if req.active is True:
+        if req.day not in entity_days:
+            entity_days.append(req.day)
+    elif req.active is False:
+        if req.day in entity_days:
+            entity_days.remove(req.day)
+    else:
+        # Toggle
+        if req.day in entity_days:
+            entity_days.remove(req.day)
+        else:
+            entity_days.append(req.day)
+
+    solution = run_solver()
+    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
+    STATE["current_solution"] = solution
+    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+    return solution
+
+@app.post("/api/production/clear-soft-locks", response_model=ScheduleSolution)
+async def clear_soft_locks():
+    STATE["soft_locks"] = {}
+    solution = run_solver()
     solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
     STATE["current_solution"] = solution
     await event_bus.publish("schedule.optimized.solution", solution.model_dump())
@@ -620,16 +634,7 @@ async def inject_disruption(alert: DisruptionAlert):
     STATE["active_disruptions"].append(alert)
     await event_bus.publish("schedule.disruption.alert", alert.model_dump())
 
-    solver = StripboardSolver(
-        scenes=STATE["scenes"],
-        actors=STATE["actors"],
-        num_days=STATE["num_days"],
-        max_minutes_per_day=STATE["max_minutes_per_day"],
-        w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
-    )
-    solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
-    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
+    solution = run_solver(disruptions=STATE["active_disruptions"])
     solution.executive_memo = memo_agent.generate_memo(solution, disruption_reason=alert.reason, use_ai=False)
     STATE["current_solution"] = solution
     await event_bus.publish("schedule.optimized.solution", solution.model_dump())
@@ -644,16 +649,7 @@ async def inject_disruption_batch(req: DisruptBatchRequest):
         STATE["active_disruptions"].append(alert)
         await event_bus.publish("schedule.disruption.alert", alert.model_dump())
 
-    solver = StripboardSolver(
-        scenes=STATE["scenes"],
-        actors=STATE["actors"],
-        num_days=STATE["num_days"],
-        max_minutes_per_day=STATE["max_minutes_per_day"],
-        w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
-    )
-    solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
-    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
+    solution = run_solver(disruptions=STATE["active_disruptions"])
     summary_reasons = "; ".join([a.reason for a in req.alerts])
     solution.executive_memo = memo_agent.generate_memo(solution, disruption_reason=summary_reasons, use_ai=False)
     STATE["current_solution"] = solution
@@ -663,18 +659,10 @@ async def inject_disruption_batch(req: DisruptBatchRequest):
 @app.post("/api/schedule/reset", response_model=ScheduleSolution)
 async def reset_schedule():
     STATE["active_disruptions"] = []
+    STATE["soft_locks"] = {}
     for s in STATE["scenes"]:
         s.locked_day = None
-    solver = StripboardSolver(
-        scenes=STATE["scenes"],
-        actors=STATE["actors"],
-        num_days=STATE["num_days"],
-        max_minutes_per_day=STATE["max_minutes_per_day"],
-        w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
-    )
-    solution = solver.solve(disruptions=[], naive_cost=STATE.get("naive_cost", None))
-    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
+    solution = run_solver(disruptions=[])
     solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
     STATE["current_solution"] = solution
     await event_bus.publish("schedule.optimized.solution", solution.model_dump())
