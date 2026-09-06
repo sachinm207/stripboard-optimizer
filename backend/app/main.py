@@ -312,14 +312,59 @@ async def import_csv_production(req: ImportCSVRequest):
     await event_bus.publish("schedule.optimized.solution", solution.model_dump())
     return solution
 
+class PresetPayload(BaseModel):
+    preset_id: Optional[str] = "neon_horizon_20d"
+
 @app.post("/api/production/load-preset", response_model=ScheduleSolution)
-async def load_preset(preset_id: str = "neon_horizon_20d"):
-    filename = "neon_horizon_20d.json" if "20" in preset_id else "neon_horizon.json"
+async def load_preset(preset_id: Optional[str] = None, payload: Optional[PresetPayload] = None):
+    target_id = (payload.preset_id if payload and payload.preset_id else None) or preset_id or "neon_horizon_20d"
+    filename = "neon_horizon_20d.json" if "20" in target_id else "neon_horizon.json"
     load_seed_data(preset_filename=filename)
     if not STATE["current_solution"]:
         raise HTTPException(status_code=500, detail="Could not load preset")
+    await event_bus.publish("production.scene.catalog", [s.model_dump() for s in STATE["scenes"]])
+    await event_bus.publish("actor.contract.constraints", [a.model_dump() for a in STATE["actors"]])
     await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
     return STATE["current_solution"]
+
+class SettingsUpdateRequest(BaseModel):
+    w_turnaround: Optional[int] = None
+    permit_lead_days: Optional[int] = None
+    max_minutes_per_day: Optional[int] = None
+
+@app.get("/api/production/settings")
+def get_production_settings():
+    return {
+        "w_turnaround": STATE["w_turnaround"],
+        "permit_lead_days": STATE["permit_lead_days"],
+        "max_minutes_per_day": STATE["max_minutes_per_day"],
+        "num_days": STATE["num_days"],
+    }
+
+@app.post("/api/production/settings", response_model=ScheduleSolution)
+async def update_production_settings(req: SettingsUpdateRequest):
+    if req.w_turnaround is not None:
+        STATE["w_turnaround"] = req.w_turnaround
+        union_agent.forced_call_penalty = req.w_turnaround
+    if req.permit_lead_days is not None:
+        STATE["permit_lead_days"] = req.permit_lead_days
+    if req.max_minutes_per_day is not None:
+        STATE["max_minutes_per_day"] = req.max_minutes_per_day
+
+    solver = StripboardSolver(
+        scenes=STATE["scenes"],
+        actors=STATE["actors"],
+        num_days=STATE["num_days"],
+        max_minutes_per_day=STATE["max_minutes_per_day"],
+        w_turnaround=STATE["w_turnaround"],
+        permit_lead_days=STATE["permit_lead_days"]
+    )
+    solution = solver.solve(disruptions=STATE["active_disruptions"])
+    solution.production_id = STATE["production_id"]
+    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
+    STATE["current_solution"] = solution
+    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+    return solution
 
 class SolveRequest(BaseModel):
     disruptions: Optional[List[DisruptionAlert]] = None

@@ -108,4 +108,29 @@ export async function injectDisruptionBatch(alerts: DisruptionAlert[]): Promise<
   return res.json();
 }
 
+export async function fetchProductionSettings(): Promise<{
+  w_turnaround: number;
+  permit_lead_days: number;
+  max_minutes_per_day: number;
+  num_days: number;
+}> {
+  const res = await fetch(`${API_BASE}/production/settings`);
+  if (!res.ok) throw new Error('Failed to fetch settings');
+  return res.json();
+}
+
+export async function updateProductionSettings(settings: {
+  w_turnaround?: number;
+  permit_lead_days?: number;
+  max_minutes_per_day?: number;
+}): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) throw new Error('Failed to update settings');
+  return res.json();
+}
+
 

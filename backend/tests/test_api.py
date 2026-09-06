@@ -214,6 +214,28 @@ def test_batch_disruptions():
     assert sol["status"] in ("OPTIMAL", "FEASIBLE")
     assert len(sol["disruptions_applied"]) >= 2
 
+def test_production_settings():
+    res = client.get("/api/production/settings")
+    assert res.status_code == 200
+    data = res.json()
+    assert "w_turnaround" in data
+    assert "permit_lead_days" in data
+    assert "max_minutes_per_day" in data
+
+    update_res = client.post("/api/production/settings", json={
+        "w_turnaround": 30000,
+        "permit_lead_days": 2,
+        "max_minutes_per_day": 540
+    })
+    assert update_res.status_code == 200
+    sol = update_res.json()
+    assert sol["status"] in ("OPTIMAL", "FEASIBLE")
+
+    verify_res = client.get("/api/production/settings")
+    assert verify_res.json()["w_turnaround"] == 30000
+    assert verify_res.json()["permit_lead_days"] == 2
+    assert verify_res.json()["max_minutes_per_day"] == 540
+
 
 
 

@@ -6,6 +6,7 @@ import { DoodMatrix } from './components/DoodMatrix';
 import { ChaosDrawer } from './components/ChaosDrawer';
 import { ProducerMemoModal } from './components/ProducerMemoModal';
 import { ImportModal } from './components/ImportModal';
+import { SettingsModal } from './components/SettingsModal';
 import {
   fetchSchedule,
   fetchScenes,
@@ -32,6 +33,7 @@ export const App: React.FC = () => {
   const [isChaosOpen, setIsChaosOpen] = useState(false);
   const [isMemoOpen, setIsMemoOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isGeneratingGemini, setIsGeneratingGemini] = useState(false);
   const [activeTab, setActiveTab] = useState<'stripboard' | 'dood' | 'union' | 'kafka'>('stripboard');
   const [isSolving, setIsSolving] = useState(false);
@@ -256,6 +258,7 @@ export const App: React.FC = () => {
         onOpenChaos={() => setIsChaosOpen(true)}
         onOpenMemo={() => setIsMemoOpen(true)}
         onOpenImport={() => setIsImportOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         onReset={handleReset}
         onSwitchPreset={handleSwitchPreset}
         isSolving={isSolving}
@@ -456,6 +459,17 @@ export const App: React.FC = () => {
         onImport={handleImport}
         onImportCSV={handleImportCSV}
         isImporting={isSolving}
+      />
+
+      {/* Production Policy & Union Rules Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSaved={(updatedSol) => {
+          setSolution(updatedSol);
+          fetchUnionAudit().then(setUnionAudit).catch(() => null);
+        }}
+        isSaving={isSolving}
       />
     </div>
   );

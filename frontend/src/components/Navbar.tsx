@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clapperboard, Cpu, Sparkles, Radio, Flame, FileText, RotateCcw, Upload } from 'lucide-react';
+import { Clapperboard, Cpu, Sparkles, Radio, Flame, FileText, RotateCcw, Upload, Sliders } from 'lucide-react';
 import { KafkaStatus } from '../types';
 
 interface NavbarProps {
@@ -8,6 +8,7 @@ interface NavbarProps {
   onOpenChaos: () => void;
   onOpenMemo: () => void;
   onOpenImport?: () => void;
+  onOpenSettings?: () => void;
   onReset: () => void;
   onSwitchPreset?: (presetId: string) => void;
   isSolving?: boolean;
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenChaos,
   onOpenMemo,
   onOpenImport,
+  onOpenSettings,
   onReset,
   onSwitchPreset,
   isSolving = false,
@@ -108,6 +110,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 20-Day Feature
               </button>
             </div>
+          )}
+
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 hover:text-purple-200 text-xs font-semibold transition-all shadow-sm"
+              title="Configure SAG-AFTRA penalty rates, permit lead times, and hour limits"
+            >
+              <Sliders className="w-3.5 h-3.5 text-purple-400" />
+              <span>Rules & Policy</span>
+            </button>
           )}
 
           {onOpenImport && (
