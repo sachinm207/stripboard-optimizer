@@ -34,13 +34,13 @@ export const StripItem: React.FC<StripItemProps> = ({
     colorClasses = 'bg-slate-100 text-slate-900 border-slate-300 shadow-slate-950/20';
     badgeClasses = 'bg-slate-200 text-slate-800';
   } else if (isExt && isNight) {
-    // EXT NIGHT: Violet
-    colorClasses = 'bg-violet-200 text-violet-950 border-violet-300 shadow-violet-950/20';
-    badgeClasses = 'bg-violet-300/80 text-violet-950';
+    // EXT NIGHT: Violet (deeper shade)
+    colorClasses = 'bg-violet-400 text-slate-950 border-violet-500 shadow-violet-950/20';
+    badgeClasses = 'bg-violet-500/40 text-slate-950';
   } else {
-    // INT NIGHT: Blue
-    colorClasses = 'bg-sky-200 text-sky-950 border-sky-300 shadow-sky-950/20';
-    badgeClasses = 'bg-sky-300/80 text-sky-950';
+    // INT NIGHT: Blue (deeper shade)
+    colorClasses = 'bg-blue-400 text-slate-950 border-blue-500 shadow-blue-950/20';
+    badgeClasses = 'bg-blue-500/40 text-slate-950';
   }
 
   // Format page eighths (e.g., 18 -> 2 2/8)
@@ -103,9 +103,9 @@ export const StripItem: React.FC<StripItemProps> = ({
           <Clock className="w-2.5 h-2.5" /> {scene.est_shoot_minutes}m
         </span>
 
-        {/* Move / Lock to Day Dropdown */}
+        {/* Move / Lock Controls */}
         {(onMoveScene || onLockScene) && (
-          <div className="flex items-center gap-1 ml-0.5" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5 ml-0.5" onClick={(e) => e.stopPropagation()}>
             {scene.locked_day != null ? (
               <div className="flex items-center gap-1 bg-amber-600 text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-sm">
                 <Lock className="w-2.5 h-2.5" />
@@ -114,37 +114,64 @@ export const StripItem: React.FC<StripItemProps> = ({
                   <button
                     onClick={() => onLockScene(scene.scene_id, null)}
                     title="Unlock scene (allow optimizer to move)"
-                    className="ml-1 text-amber-200 hover:text-white font-bold"
+                    className="ml-1 text-amber-200 hover:text-white font-bold cursor-pointer"
                   >
                     Unlock ✕
                   </button>
                 )}
               </div>
             ) : (
-              <select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    const target = parseInt(e.target.value, 10);
-                    if (onMoveScene) {
-                      onMoveScene(scene.scene_id, target);
-                    } else if (onLockScene) {
+              <>
+                {/* 1-click Lock to Current Day Button */}
+                {onLockScene && currentDay != null && (
+                  <button
+                    onClick={() => onLockScene(scene.scene_id, currentDay)}
+                    title={`Lock scene to Day ${currentDay} (hard constraint)`}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/10 hover:bg-amber-600 hover:text-white text-slate-900 border border-black/15 text-[10px] font-bold transition-all cursor-pointer"
+                  >
+                    <Lock className="w-2.5 h-2.5" />
+                    <span>Lock</span>
+                  </button>
+                )}
+
+                {/* Dropdown for Move (Flexible) or Lock (Fixed) to any day */}
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const [action, dayStr] = val.split(':');
+                    const target = parseInt(dayStr, 10);
+                    if (action === 'lock' && onLockScene) {
                       onLockScene(scene.scene_id, target);
+                    } else if (action === 'move' && onMoveScene) {
+                      onMoveScene(scene.scene_id, target);
                     }
-                  }
-                }}
-                className="text-[10px] font-semibold bg-black/10 hover:bg-black/20 text-slate-900 rounded px-1.5 py-0.5 border border-black/15 cursor-pointer outline-none transition-colors"
-                title="Move this scene to a specific shoot day (without locking)"
-              >
-                <option value="" disabled>
-                  Move to...
-                </option>
-                {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>
-                    Day {d} {d === currentDay ? '(Current)' : ''}
+                  }}
+                  className="text-[10px] font-semibold bg-black/10 hover:bg-black/20 text-slate-900 rounded px-1.5 py-0.5 border border-black/15 cursor-pointer outline-none transition-colors"
+                  title="Move flexibly or Lock to a specific day"
+                >
+                  <option value="" disabled>
+                    Move / Lock...
                   </option>
-                ))}
-              </select>
+                  <optgroup label="Move (Flexible)">
+                    {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => (
+                      <option key={`move-${d}`} value={`move:${d}`}>
+                        Move to Day {d} {d === currentDay ? '(Current)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {onLockScene && (
+                    <optgroup label="🔒 Lock to Day (Fixed)">
+                      {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => (
+                        <option key={`lock-${d}`} value={`lock:${d}`}>
+                          🔒 Lock to Day {d} {d === currentDay ? '(Current)' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </>
             )}
           </div>
         )}

@@ -29,11 +29,11 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLoc
             <span className="text-slate-300 text-[11px]">INT DAY</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-violet-200 border border-violet-300" />
+            <span className="w-3 h-3 rounded-sm bg-violet-400 border border-violet-500" />
             <span className="text-slate-300 text-[11px]">EXT NIGHT</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-sky-200 border border-sky-300" />
+            <span className="w-3 h-3 rounded-sm bg-blue-400 border border-blue-500" />
             <span className="text-slate-300 text-[11px]">INT NIGHT</span>
           </div>
         </div>
