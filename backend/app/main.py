@@ -12,7 +12,7 @@ from backend.app.models.scene import Scene, SceneSetting
 from backend.app.models.actor import Actor
 from backend.app.models.disruption import DisruptionAlert
 from backend.app.models.schedule import ScheduleSolution
-from backend.app.solver.cp_sat_model import StripboardSolver
+from backend.app.solver.cp_sat_model import StripboardSolver, generate_naive_schedule
 from backend.app.kafka.bus import event_bus, ALL_TOPICS
 from backend.app.agents.memo_agent import ExecutiveMemoAgent
 from backend.app.agents.union_agent import UnionComplianceAgent
@@ -21,14 +21,17 @@ from contextlib import asynccontextmanager
 
 # In-memory application state
 STATE = {
-    "production_id": "prod_neon_horizon",
-    "title": "Neon Horizon",
+    "production_id": None,
+    "title": None,
     "scenes": [],
     "actors": [],
     "num_days": 5,
     "max_minutes_per_day": 600,
+    "w_hold": 2000,
+    "w_move": 15000,
     "w_turnaround": 25000,
     "permit_lead_days": 0,
+    "naive_cost": 0,
     "current_solution": None,
     "active_disruptions": [],
 }
@@ -36,7 +39,7 @@ STATE = {
 memo_agent = ExecutiveMemoAgent()
 union_agent = UnionComplianceAgent()
 
-def load_seed_data(preset_filename: str = "neon_horizon.json"):
+def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = False):
     data_path = os.path.join(os.path.dirname(__file__), "demo_data", preset_filename)
     if os.path.exists(data_path):
         with open(data_path, "r") as f:
@@ -49,21 +52,34 @@ def load_seed_data(preset_filename: str = "neon_horizon.json"):
             STATE["max_minutes_per_day"] = data.get("max_minutes_per_day", 600)
             STATE["active_disruptions"] = []
 
-    # Pre-generate baseline solution (instant startup with template)
-    solver = StripboardSolver(
+    # Calculate naive script-order schedule baseline
+    naive_solution = generate_naive_schedule(
         scenes=STATE["scenes"],
         actors=STATE["actors"],
         num_days=STATE["num_days"],
         max_minutes_per_day=STATE["max_minutes_per_day"],
-        w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
+        w_hold=STATE["w_hold"],
+        w_move=STATE["w_move"],
+        w_turnaround=STATE["w_turnaround"]
     )
-    solution = solver.solve(disruptions=[])
-    solution.production_id = STATE["production_id"]
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
+    naive_solution.production_id = STATE["production_id"]
+    STATE["naive_cost"] = naive_solution.metrics.objective_cost
 
-load_seed_data()
+    if not optimize:
+        STATE["current_solution"] = naive_solution
+    else:
+        solver = StripboardSolver(
+            scenes=STATE["scenes"],
+            actors=STATE["actors"],
+            num_days=STATE["num_days"],
+            max_minutes_per_day=STATE["max_minutes_per_day"],
+            w_turnaround=STATE["w_turnaround"],
+            permit_lead_days=STATE["permit_lead_days"]
+        )
+        solution = solver.solve(disruptions=[], naive_cost=STATE["naive_cost"])
+        solution.production_id = STATE["production_id"]
+        solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
+        STATE["current_solution"] = solution
 
 class ConnectionManager:
     def __init__(self):
@@ -313,19 +329,57 @@ async def import_csv_production(req: ImportCSVRequest):
     return solution
 
 class PresetPayload(BaseModel):
-    preset_id: Optional[str] = "neon_horizon_20d"
+    preset_id: Optional[str] = "neon_horizon"
+    optimize: bool = False
 
 @app.post("/api/production/load-preset", response_model=ScheduleSolution)
-async def load_preset(preset_id: Optional[str] = None, payload: Optional[PresetPayload] = None):
-    target_id = (payload.preset_id if payload and payload.preset_id else None) or preset_id or "neon_horizon_20d"
+async def load_preset(preset_id: Optional[str] = None, optimize: bool = False, payload: Optional[PresetPayload] = None):
+    target_id = (payload.preset_id if payload and payload.preset_id else None) or preset_id or "neon_horizon"
+    should_optimize = (payload.optimize if payload and payload.optimize is not None else optimize)
     filename = "neon_horizon_20d.json" if "20" in target_id else "neon_horizon.json"
-    load_seed_data(preset_filename=filename)
+    load_seed_data(preset_filename=filename, optimize=should_optimize)
     if not STATE["current_solution"]:
         raise HTTPException(status_code=500, detail="Could not load preset")
     await event_bus.publish("production.scene.catalog", [s.model_dump() for s in STATE["scenes"]])
     await event_bus.publish("actor.contract.constraints", [a.model_dump() for a in STATE["actors"]])
     await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
     return STATE["current_solution"]
+
+class LockSceneRequest(BaseModel):
+    scene_id: str
+    locked_day: Optional[int] = None
+
+@app.post("/api/production/lock-scene", response_model=ScheduleSolution)
+async def lock_scene_to_day(req: LockSceneRequest):
+    for s in STATE["scenes"]:
+        if s.scene_id == req.scene_id:
+            s.locked_day = req.locked_day
+            break
+
+    solver = StripboardSolver(
+        scenes=STATE["scenes"],
+        actors=STATE["actors"],
+        num_days=STATE["num_days"],
+        max_minutes_per_day=STATE["max_minutes_per_day"],
+        w_turnaround=STATE["w_turnaround"],
+        permit_lead_days=STATE["permit_lead_days"]
+    )
+    solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
+    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
+    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
+    STATE["current_solution"] = solution
+    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
+    return solution
+
+@app.post("/api/schedule/clear")
+async def clear_production_schedule():
+    STATE["production_id"] = None
+    STATE["title"] = None
+    STATE["scenes"] = []
+    STATE["actors"] = []
+    STATE["current_solution"] = None
+    STATE["active_disruptions"] = []
+    return {"status": "cleared"}
 
 class SettingsUpdateRequest(BaseModel):
     w_turnaround: Optional[int] = None
@@ -385,11 +439,12 @@ async def solve_schedule(request: Optional[SolveRequest] = None):
         w_turnaround=w_turnaround,
         permit_lead_days=permit_lead_days
     )
-    solution = solver.solve(disruptions=disruptions)
+    solution = solver.solve(disruptions=disruptions, naive_cost=STATE.get("naive_cost", None))
     if solution.status == "INFEASIBLE":
         raise HTTPException(status_code=422, detail="No feasible schedule found satisfying all constraints.")
 
-    solution.executive_memo = memo_agent.generate_memo(solution)
+    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
+    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
     STATE["current_solution"] = solution
     await event_bus.publish("schedule.optimized.solution", solution.model_dump())
     return solution
@@ -407,7 +462,8 @@ async def inject_disruption(alert: DisruptionAlert):
         w_turnaround=STATE["w_turnaround"],
         permit_lead_days=STATE["permit_lead_days"]
     )
-    solution = solver.solve(disruptions=STATE["active_disruptions"])
+    solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
+    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
     solution.executive_memo = memo_agent.generate_memo(solution, disruption_reason=alert.reason, use_ai=False)
     STATE["current_solution"] = solution
     await event_bus.publish("schedule.optimized.solution", solution.model_dump())
@@ -430,7 +486,8 @@ async def inject_disruption_batch(req: DisruptBatchRequest):
         w_turnaround=STATE["w_turnaround"],
         permit_lead_days=STATE["permit_lead_days"]
     )
-    solution = solver.solve(disruptions=STATE["active_disruptions"])
+    solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
+    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
     summary_reasons = "; ".join([a.reason for a in req.alerts])
     solution.executive_memo = memo_agent.generate_memo(solution, disruption_reason=summary_reasons, use_ai=False)
     STATE["current_solution"] = solution

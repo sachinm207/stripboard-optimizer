@@ -5,27 +5,52 @@ import { ScheduleMetrics, DisruptionAlert } from '../types';
 interface CostMeterProps {
   metrics: ScheduleMetrics;
   disruptions: DisruptionAlert[];
+  status?: string;
 }
 
-export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions }) => {
+export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, status }) => {
   const isCompliant = metrics.total_turnaround_violations === 0;
+  const isRaw = status === 'RAW_UNOPTIMIZED';
+
+  let savingsTitle = 'Schedule Baseline';
+  let savingsValue = 'Nominal Clean';
+  let savingsSubtitle = '0 active disruptions';
+  let savingsBorder = 'border-emerald-500/30';
+  let savingsTextColor = 'text-emerald-400';
+
+  if (isRaw) {
+    savingsTitle = 'Script Baseline';
+    savingsValue = '$0 Saved';
+    savingsSubtitle = 'Unoptimized script order';
+    savingsBorder = 'border-amber-500/40';
+    savingsTextColor = 'text-amber-400';
+  } else if (disruptions.length > 0) {
+    savingsTitle = 'Crisis Budget Saved';
+    savingsValue = `$${metrics.cost_saved_vs_naive.toLocaleString()}`;
+    savingsSubtitle = 'saved vs shutdown';
+    savingsBorder = 'border-emerald-500/40';
+    savingsTextColor = 'text-emerald-400';
+  } else if (metrics.cost_saved_vs_naive > 0) {
+    savingsTitle = 'Script Optimization';
+    savingsValue = `$${metrics.cost_saved_vs_naive.toLocaleString()}`;
+    savingsSubtitle = 'saved vs raw script order';
+    savingsBorder = 'border-emerald-500/40';
+    savingsTextColor = 'text-emerald-400';
+  }
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 my-6">
       {/* 1. Net Savings Meter */}
-      <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3.5 shadow-lg relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition-all" />
-        <div className="flex items-center justify-between text-xs text-emerald-400 font-medium mb-1">
-          <span>{disruptions.length > 0 ? 'Crisis Budget Saved' : 'Schedule Baseline'}</span>
-          <TrendingUp className="w-4 h-4 text-emerald-400" />
+      <div className={`bg-slate-900/90 border ${savingsBorder} rounded-xl p-3.5 shadow-lg relative overflow-hidden group`}>
+        <div className="flex items-center justify-between text-xs font-medium mb-1">
+          <span className={savingsTextColor}>{savingsTitle}</span>
+          <TrendingUp className={`w-4 h-4 ${savingsTextColor}`} />
         </div>
         <div className="text-xl lg:text-2xl font-black text-white tracking-tight">
-          {disruptions.length > 0
-            ? `$${metrics.cost_saved_vs_naive.toLocaleString()}`
-            : 'Nominal Clean'}
+          {savingsValue}
         </div>
-        <p className="text-[11px] text-emerald-400/80 font-mono mt-0.5">
-          {disruptions.length > 0 ? 'saved vs. naive shutdown' : '0 active disruptions'}
+        <p className={`text-[11px] ${savingsTextColor}/80 font-mono mt-0.5`}>
+          {savingsSubtitle}
         </p>
       </div>
 
@@ -36,9 +61,11 @@ export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions }) =>
           <Clock className="w-4 h-4 text-sky-400" />
         </div>
         <div className="text-xl lg:text-2xl font-black text-white tracking-tight font-mono">
-          {metrics.solver_runtime_ms} <span className="text-xs font-normal text-slate-400">ms</span>
+          {isRaw ? '--' : metrics.solver_runtime_ms} <span className="text-xs font-normal text-slate-400">ms</span>
         </div>
-        <p className="text-[11px] text-sky-400/80 font-mono mt-0.5">Exact satisfaction</p>
+        <p className="text-[11px] text-sky-400/80 font-mono mt-0.5">
+          {isRaw ? 'Awaiting solve trigger' : 'Exact satisfaction'}
+        </p>
       </div>
 
       {/* 3. SAG-AFTRA Turnaround */}

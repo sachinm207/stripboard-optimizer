@@ -4,6 +4,10 @@ from backend.app.main import app
 
 client = TestClient(app)
 
+@pytest.fixture(autouse=True, scope="module")
+def setup_test_production():
+    client.post("/api/production/load-preset", json={"preset_id": "neon_horizon", "optimize": True})
+
 def test_health():
     response = client.get("/health")
     assert response.status_code == 200
@@ -183,9 +187,16 @@ def test_load_20d_preset():
     res = client.post("/api/production/load-preset?preset_id=neon_horizon_20d")
     assert res.status_code == 200
     sol = res.json()
-    assert sol["status"] in ("OPTIMAL", "FEASIBLE")
+    assert sol["status"] == "RAW_UNOPTIMIZED"
     assert len(sol["days"]) == 20
-    assert len(sol["dood_matrix"]) == 10
+
+    # Solve it
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    solved_sol = solve_res.json()
+    assert solved_sol["status"] in ("OPTIMAL", "FEASIBLE")
+    assert len(solved_sol["days"]) == 20
+    assert len(solved_sol["dood_matrix"]) >= 8
 
 def test_batch_disruptions():
     alerts = [

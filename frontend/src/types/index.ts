@@ -9,6 +9,7 @@ export interface Scene {
   cast_ids: string[];
   description: string;
   requires_pyro?: boolean;
+  locked_day?: number;
 }
 
 export interface Actor {

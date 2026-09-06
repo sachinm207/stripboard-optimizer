@@ -90,11 +90,41 @@ export async function importCSVProduction(payload: {
   return res.json();
 }
 
-export async function loadPreset(presetId: string): Promise<ScheduleSolution> {
-  const res = await fetch(`${API_BASE}/production/load-preset?preset_id=${presetId}`, {
+export async function loadPreset(presetId: string, optimize: boolean = false): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/load-preset`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ preset_id: presetId, optimize }),
   });
   if (!res.ok) throw new Error('Failed to load production preset');
+  return res.json();
+}
+
+export async function solveSchedule(): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/schedule/solve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error('Failed to solve schedule');
+  return res.json();
+}
+
+export async function lockScene(sceneId: string, lockedDay: number | null): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/lock-scene`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scene_id: sceneId, locked_day: lockedDay }),
+  });
+  if (!res.ok) throw new Error('Failed to lock/unlock scene');
+  return res.json();
+}
+
+export async function clearSchedule(): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/schedule/clear`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to clear schedule');
   return res.json();
 }
 

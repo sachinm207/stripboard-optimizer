@@ -26,3 +26,4 @@ class Scene(BaseModel):
     description: str = ""
     precedence_before: List[str] = Field(default_factory=list, description="IDs of scenes that must shoot AFTER this scene")
     permit_days: Optional[List[int]] = Field(default=None, description="Restricted shoot days allowed for this scene")
+    locked_day: Optional[int] = Field(default=None, description="Manually locked shoot day preference by AD/Director")

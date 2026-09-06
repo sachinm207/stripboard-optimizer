@@ -38,7 +38,8 @@ class StripboardSolver:
     def solve(
         self,
         disruptions: Optional[List[DisruptionAlert]] = None,
-        time_limit_seconds: float = 5.0
+        time_limit_seconds: float = 5.0,
+        naive_cost: Optional[int] = None
     ) -> ScheduleSolution:
         start_time = time.time()
         disruptions = disruptions or []
@@ -97,6 +98,11 @@ class StripboardSolver:
                 for d in D:
                     if d not in s.permit_days:
                         model.Add(X[s.scene_id, d] == 0)
+
+        # 3b. Manual Pinning / Lock Day Constraint (Human AD Manual Override)
+        for s in self.scenes:
+            if s.locked_day is not None and s.locked_day in D:
+                model.Add(X[s.scene_id, s.locked_day] == 1)
 
         # 4. Precedence Constraints
         for s in self.scenes:
@@ -263,7 +269,8 @@ class StripboardSolver:
             objective_cost = int(solver.ObjectiveValue())
 
             # Naive baseline estimation
-            naive_cost = (15 * self.w_hold) + (10 * self.w_move) + (1 * self.w_turnaround)
+            if naive_cost is None:
+                naive_cost = (15 * self.w_hold) + (10 * self.w_move) + (1 * self.w_turnaround)
             cost_saved = max(0, naive_cost - objective_cost)
 
             compliance_rate = 1.0 if total_turnaround_violations == 0 else max(0.0, 1.0 - (total_turnaround_violations * 0.2))
@@ -334,3 +341,86 @@ class StripboardSolver:
                 disruptions_applied=disruptions,
                 executive_memo=arbitration_memo,
             )
+
+def generate_naive_schedule(
+    scenes: List[Scene],
+    actors: List[Actor],
+    num_days: int = 5,
+    max_minutes_per_day: int = 600,
+    w_hold: int = 2000,
+    w_move: int = 15000,
+    w_turnaround: int = 25000
+) -> ScheduleSolution:
+    """
+    Generates a raw, unoptimized schedule packing scenes in sequential script order.
+    Demonstrates the baseline chaos before CP-SAT optimization.
+    """
+    scheduled_days_dict: Dict[int, List[Scene]] = {d: [] for d in range(1, num_days + 1)}
+    current_day = 1
+    current_day_minutes = 0
+
+    for s in scenes:
+        if current_day_minutes + s.est_shoot_minutes > max_minutes_per_day and current_day < num_days:
+            current_day += 1
+            current_day_minutes = 0
+        scheduled_days_dict[current_day].append(s)
+        current_day_minutes += s.est_shoot_minutes
+
+    day_schedules: List[DaySchedule] = []
+    total_moves = 0
+    for d in range(1, num_days + 1):
+        scs = scheduled_days_dict[d]
+        tot_duration = sum(sc.est_shoot_minutes for sc in scs)
+        day_locs = sorted(list({sc.location for sc in scs}))
+        day_moves = max(0, len(day_locs) - 1)
+        total_moves += day_moves
+        has_night = any("NIGHT" in sc.setting.value for sc in scs)
+        has_day = any("DAY" in sc.setting.value for sc in scs)
+
+        day_schedules.append(
+            DaySchedule(
+                day_number=d,
+                scenes=scs,
+                total_duration_minutes=tot_duration,
+                locations=day_locs,
+                company_moves=day_moves,
+                is_night=has_night,
+                is_day=has_day,
+            )
+        )
+
+    dood_rows = calculate_dood_matrix(actors, scheduled_days_dict, num_days)
+    total_hold_days = sum(r.hold_days for r in dood_rows)
+
+    total_turnaround_violations = 0
+    for d in range(len(day_schedules) - 1):
+        if day_schedules[d].is_night and day_schedules[d + 1].is_day:
+            total_turnaround_violations += 1
+
+    naive_cost = (total_hold_days * w_hold) + (total_moves * w_move) + (total_turnaround_violations * w_turnaround)
+
+    metrics = ScheduleMetrics(
+        objective_cost=naive_cost,
+        cost_saved_vs_naive=0,
+        total_company_moves=total_moves,
+        total_hold_days=total_hold_days,
+        total_turnaround_violations=total_turnaround_violations,
+        solver_runtime_ms=0,
+        union_compliance_rate=1.0 if total_turnaround_violations == 0 else max(0.0, 1.0 - (total_turnaround_violations * 0.25)),
+    )
+
+    return ScheduleSolution(
+        solution_id=f"naive_{uuid.uuid4().hex[:8]}",
+        production_id="prod_raw_unoptimized",
+        status="RAW_UNOPTIMIZED",
+        days=day_schedules,
+        dood_matrix=dood_rows,
+        metrics=metrics,
+        disruptions_applied=[],
+        executive_memo=(
+            "⚠️ RAW SCRIPT-ORDER SCHEDULE LOADED (UNOPTIMIZED)\n\n"
+            "Scenes are currently placed in sequential script order. Notice the high company moves, "
+            "costly actor hold fees, and potential union turnaround violations.\n\n"
+            "👉 Click 'RUN AUTONOMOUS CP-SAT OPTIMIZER' to let the mathematical engine solve the global optimum!"
+        ),
+    )

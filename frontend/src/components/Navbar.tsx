@@ -1,15 +1,17 @@
 import React from 'react';
-import { Clapperboard, Cpu, Sparkles, Radio, Flame, FileText, RotateCcw, Upload, Sliders } from 'lucide-react';
+import { Clapperboard, Cpu, Sparkles, Radio, Flame, FileText, RotateCcw, Upload, Sliders, Home } from 'lucide-react';
 import { KafkaStatus } from '../types';
 
 interface NavbarProps {
-  productionId: string;
+  productionId?: string | null;
   kafkaStatus?: KafkaStatus | null;
+  hasProduction?: boolean;
   onOpenChaos: () => void;
   onOpenMemo: () => void;
   onOpenImport?: () => void;
   onOpenSettings?: () => void;
   onReset: () => void;
+  onClear?: () => void;
   onSwitchPreset?: (presetId: string) => void;
   isSolving?: boolean;
 }
@@ -17,11 +19,13 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   productionId,
   kafkaStatus,
+  hasProduction = true,
   onOpenChaos,
   onOpenMemo,
   onOpenImport,
   onOpenSettings,
   onReset,
+  onClear,
   onSwitchPreset,
   isSolving = false,
 }) => {
@@ -37,7 +41,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-white tracking-tight">STRIPBOARD OPTIMIZER</h1>
               <span className="px-2 py-0.5 text-xs font-semibold rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                PROD: {productionId.toUpperCase()}
+                PROD: {productionId ? productionId.toUpperCase() : 'LAUNCHER'}
               </span>
             </div>
             <p className="text-xs text-slate-400">Autonomous Event-Driven CP-SAT & Gemini Multi-Agent Scheduler</p>
@@ -53,12 +57,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-sky-400">
             <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-            <span>Gemini 2.5 / 3.5 Flash</span>
+            <span>Gemini 2.5 Pro</span>
           </div>
 
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-purple-400">
             <Radio className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
-            <span>Confluent Kafka Event Mesh</span>
+            <span>Confluent Kafka Mesh</span>
             <span className="px-1 py-0.2 text-[10px] rounded bg-purple-500/20 text-purple-300">
               {kafkaStatus?.topics?.length || 5} Topics
             </span>
@@ -67,47 +71,51 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2.5">
-          <button
-            onClick={onOpenChaos}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 hover:text-rose-200 text-xs font-semibold transition-all shadow-sm"
-          >
-            <Flame className="w-4 h-4 text-rose-400" />
-            <span>Throw Chaos</span>
-          </button>
+          {hasProduction && (
+            <>
+              <button
+                onClick={onOpenChaos}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 hover:text-rose-200 text-xs font-semibold transition-all shadow-sm"
+              >
+                <Flame className="w-4 h-4 text-rose-400" />
+                <span>Throw Chaos</span>
+              </button>
 
-          <button
-            onClick={onOpenMemo}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 hover:text-sky-200 text-xs font-semibold transition-all shadow-sm"
-          >
-            <FileText className="w-4 h-4 text-sky-400" />
-            <span>Executive Memo</span>
-          </button>
+              <button
+                onClick={onOpenMemo}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 hover:text-sky-200 text-xs font-semibold transition-all shadow-sm"
+              >
+                <FileText className="w-4 h-4 text-sky-400" />
+                <span>Executive Memo</span>
+              </button>
+            </>
+          )}
 
-          {onSwitchPreset && (
+          {onSwitchPreset && hasProduction && (
             <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 text-xs">
               <button
                 onClick={() => onSwitchPreset('neon_horizon')}
                 disabled={isSolving}
                 className={`px-2.5 py-1 rounded font-medium transition-all ${
-                  !productionId.includes('20')
+                  productionId && !productionId.includes('20')
                     ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
                 title="Switch to 5-day demo production"
               >
-                5-Day Sprint
+                5-Day
               </button>
               <button
                 onClick={() => onSwitchPreset('neon_horizon_20d')}
                 disabled={isSolving}
                 className={`px-2.5 py-1 rounded font-medium transition-all ${
-                  productionId.includes('20')
+                  productionId && productionId.includes('20')
                     ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
                 title="Switch to realistic 20-day feature film production"
               >
-                20-Day Feature
+                20-Day
               </button>
             </div>
           )}
@@ -133,15 +141,29 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          <button
-            onClick={onReset}
-            disabled={isSolving}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-all"
-            title="Reset board to baseline clean schedule"
-          >
-            <RotateCcw className={`w-3.5 h-3.5 ${isSolving ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Reset</span>
-          </button>
+          {hasProduction && (
+            <button
+              onClick={onReset}
+              disabled={isSolving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-all"
+              title="Reset board to baseline clean schedule"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${isSolving ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Reset</span>
+            </button>
+          )}
+
+          {hasProduction && onClear && (
+            <button
+              onClick={onClear}
+              disabled={isSolving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-white text-xs font-medium transition-all"
+              title="Close current project and return to Launcher"
+            >
+              <Home className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden lg:inline">Launcher</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

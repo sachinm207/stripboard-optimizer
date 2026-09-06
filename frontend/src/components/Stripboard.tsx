@@ -5,9 +5,10 @@ import { StripItem } from './StripItem';
 
 interface StripboardProps {
   days: DaySchedule[];
+  onLockScene?: (sceneId: string, lockedDay: number | null) => void;
 }
 
-export const Stripboard: React.FC<StripboardProps> = ({ days }) => {
+export const Stripboard: React.FC<StripboardProps> = ({ days, onLockScene }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -46,7 +47,18 @@ export const Stripboard: React.FC<StripboardProps> = ({ days }) => {
           return (
             <div
               key={day.day_number}
-              className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 shadow-sm"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const sceneId = e.dataTransfer.getData('text/plain');
+                if (sceneId && onLockScene) {
+                  onLockScene(sceneId, day.day_number);
+                }
+              }}
+              className="bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition-colors rounded-xl p-4 shadow-sm"
             >
               {/* Day Header Banner */}
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-slate-800/80">
@@ -95,13 +107,19 @@ export const Stripboard: React.FC<StripboardProps> = ({ days }) => {
 
               {/* Strips List */}
               {day.scenes.length === 0 ? (
-                <div className="py-6 text-center text-slate-500 text-xs flex items-center justify-center gap-2">
-                  <AlertCircle className="w-4 h-4" /> No scenes scheduled on this day
+                <div className="py-6 text-center text-slate-500 text-xs flex items-center justify-center gap-2 border-2 border-dashed border-slate-800/80 rounded-lg">
+                  <AlertCircle className="w-4 h-4" /> Drop scene strips here to schedule onto Day {day.day_number}
                 </div>
               ) : (
                 <div className="space-y-1">
                   {day.scenes.map((scene) => (
-                    <StripItem key={scene.scene_id} scene={scene} />
+                    <StripItem
+                      key={scene.scene_id}
+                      scene={scene}
+                      currentDay={day.day_number}
+                      totalDays={days.length}
+                      onLockScene={onLockScene}
+                    />
                   ))}
                 </div>
               )}
