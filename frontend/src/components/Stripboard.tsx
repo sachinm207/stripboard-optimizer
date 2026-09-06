@@ -5,10 +5,11 @@ import { StripItem } from './StripItem';
 
 interface StripboardProps {
   days: DaySchedule[];
+  onMoveScene?: (sceneId: string, targetDay: number) => void;
   onLockScene?: (sceneId: string, lockedDay: number | null) => void;
 }
 
-export const Stripboard: React.FC<StripboardProps> = ({ days, onLockScene }) => {
+export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLockScene }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -28,7 +29,7 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onLockScene }) => 
             <span className="text-slate-300 text-[11px]">INT DAY</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-300" />
+            <span className="w-3 h-3 rounded-sm bg-violet-200 border border-violet-300" />
             <span className="text-slate-300 text-[11px]">EXT NIGHT</span>
           </div>
           <div className="flex items-center gap-1.5">
@@ -119,6 +120,7 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onLockScene }) => 
                       scene={scene}
                       currentDay={day.day_number}
                       totalDays={days.length}
+                      onMoveScene={onMoveScene}
                       onLockScene={onLockScene}
                     />
                   ))

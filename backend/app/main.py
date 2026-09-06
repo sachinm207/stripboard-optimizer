@@ -11,8 +11,9 @@ from pydantic import BaseModel
 from backend.app.models.scene import Scene, SceneSetting
 from backend.app.models.actor import Actor
 from backend.app.models.disruption import DisruptionAlert
-from backend.app.models.schedule import ScheduleSolution
+from backend.app.models.schedule import ScheduleSolution, DaySchedule, ScheduleMetrics
 from backend.app.solver.cp_sat_model import StripboardSolver, generate_naive_schedule
+from backend.app.solver.dood_calculator import calculate_dood_matrix
 from backend.app.kafka.bus import event_bus, ALL_TOPICS
 from backend.app.agents.memo_agent import ExecutiveMemoAgent
 from backend.app.agents.union_agent import UnionComplianceAgent
@@ -370,6 +371,93 @@ async def lock_scene_to_day(req: LockSceneRequest):
     STATE["current_solution"] = solution
     await event_bus.publish("schedule.optimized.solution", solution.model_dump())
     return solution
+
+class MoveSceneRequest(BaseModel):
+    scene_id: str
+    target_day: int
+
+@app.post("/api/production/move-scene", response_model=ScheduleSolution)
+async def move_scene_to_day(req: MoveSceneRequest):
+    if not STATE["current_solution"]:
+        raise HTTPException(status_code=400, detail="No schedule loaded to move scene in.")
+
+    # Find the target scene
+    target_scene = None
+    for s in STATE["scenes"]:
+        if s.scene_id == req.scene_id:
+            target_scene = s
+            # Ensure it is not locked when moved manually
+            target_scene.locked_day = None
+            break
+
+    if not target_scene:
+        raise HTTPException(status_code=404, detail="Scene not found.")
+
+    # Reconstruct scheduled_days_dict from current solution
+    scheduled_days_dict = {
+        d.day_number: [s for s in d.scenes if s.scene_id != req.scene_id]
+        for d in STATE["current_solution"].days
+    }
+    if req.target_day not in scheduled_days_dict:
+        scheduled_days_dict[req.target_day] = []
+
+    # Place target_scene without lock
+    target_scene.locked_day = None
+    scheduled_days_dict[req.target_day].append(target_scene)
+
+    # Recompute DaySchedules
+    day_schedules: List[DaySchedule] = []
+    total_moves = 0
+    for d in range(1, STATE["num_days"] + 1):
+        scs = scheduled_days_dict.get(d, [])
+        tot_duration = sum(sc.est_shoot_minutes for sc in scs)
+        day_locs = sorted(list({sc.location for sc in scs}))
+        day_moves = max(0, len(day_locs) - 1)
+        total_moves += day_moves
+        has_night = any("NIGHT" in sc.setting.value for sc in scs)
+        has_day = any("DAY" in sc.setting.value for sc in scs)
+        day_schedules.append(
+            DaySchedule(
+                day_number=d,
+                scenes=scs,
+                total_duration_minutes=tot_duration,
+                locations=day_locs,
+                company_moves=day_moves,
+                is_night=has_night,
+                is_day=has_day,
+            )
+        )
+
+    # Recompute DOOD
+    dood_rows = calculate_dood_matrix(STATE["actors"], scheduled_days_dict, STATE["num_days"])
+    total_hold_days = sum(r.hold_days for r in dood_rows)
+
+    # Turnaround violations
+    total_turnaround_violations = 0
+    for d in range(len(day_schedules) - 1):
+        if day_schedules[d].is_night and day_schedules[d + 1].is_day:
+            total_turnaround_violations += 1
+
+    current_cost = (total_hold_days * STATE["w_hold"]) + (total_moves * STATE["w_move"]) + (total_turnaround_violations * STATE["w_turnaround"])
+    naive_baseline = STATE.get("naive_cost") or current_cost
+    cost_saved = max(0, naive_baseline - current_cost)
+
+    metrics = ScheduleMetrics(
+        objective_cost=current_cost,
+        cost_saved_vs_naive=cost_saved,
+        total_company_moves=total_moves,
+        total_hold_days=total_hold_days,
+        total_turnaround_violations=total_turnaround_violations,
+        solver_runtime_ms=0,
+        union_compliance_rate=1.0 if total_turnaround_violations == 0 else max(0.0, 1.0 - (total_turnaround_violations * 0.25)),
+    )
+
+    STATE["current_solution"].days = day_schedules
+    STATE["current_solution"].dood_matrix = dood_rows
+    STATE["current_solution"].metrics = metrics
+
+    await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+    return STATE["current_solution"]
 
 @app.post("/api/schedule/clear")
 async def clear_production_schedule():

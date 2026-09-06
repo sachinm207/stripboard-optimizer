@@ -6,9 +6,10 @@ interface CostMeterProps {
   metrics: ScheduleMetrics;
   disruptions: DisruptionAlert[];
   status?: string;
+  onSelectTab?: (tab: 'stripboard' | 'dood' | 'union' | 'kafka') => void;
 }
 
-export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, status }) => {
+export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, status, onSelectTab }) => {
   const isCompliant = metrics.total_turnaround_violations === 0;
   const isRaw = status === 'RAW_UNOPTIMIZED';
 
@@ -69,7 +70,11 @@ export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, stat
       </div>
 
       {/* 3. SAG-AFTRA Turnaround */}
-      <div className={`bg-slate-900/90 border ${isCompliant ? 'border-indigo-500/30' : 'border-rose-500/40'} rounded-xl p-3.5 shadow-lg relative overflow-hidden group`}>
+      <div
+        onClick={() => onSelectTab?.('union')}
+        className={`bg-slate-900/90 border ${isCompliant ? 'border-indigo-500/30 hover:border-indigo-400/60' : 'border-rose-500/40 hover:border-rose-400/70'} rounded-xl p-3.5 shadow-lg relative overflow-hidden group cursor-pointer transition-all hover:scale-[1.02]`}
+        title="Click to view Union & Labor Audit tab"
+      >
         <div className="flex items-center justify-between text-xs text-indigo-400 font-medium mb-1">
           <span>SAG-AFTRA 12h Rest</span>
           <ShieldCheck className={`w-4 h-4 ${isCompliant ? 'text-indigo-400' : 'text-rose-400'}`} />
@@ -80,6 +85,10 @@ export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, stat
         <p className={`text-[11px] ${isCompliant ? 'text-indigo-400/80' : 'text-rose-400'} font-mono mt-0.5`}>
           {metrics.total_turnaround_violations} forced calls
         </p>
+        <div className="mt-2 pt-1.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-indigo-300 group-hover:text-indigo-200">
+          <span>Union Audit tab</span>
+          <span>→</span>
+        </div>
       </div>
 
       {/* 4. Company Moves */}

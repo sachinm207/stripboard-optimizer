@@ -6,6 +6,7 @@ interface StripItemProps {
   scene: Scene;
   currentDay?: number;
   totalDays?: number;
+  onMoveScene?: (sceneId: string, targetDay: number) => void;
   onLockScene?: (sceneId: string, lockedDay: number | null) => void;
 }
 
@@ -13,6 +14,7 @@ export const StripItem: React.FC<StripItemProps> = ({
   scene,
   currentDay,
   totalDays = 5,
+  onMoveScene,
   onLockScene,
 }) => {
   // Normalize setting for Hollywood colors
@@ -32,9 +34,9 @@ export const StripItem: React.FC<StripItemProps> = ({
     colorClasses = 'bg-slate-100 text-slate-900 border-slate-300 shadow-slate-950/20';
     badgeClasses = 'bg-slate-200 text-slate-800';
   } else if (isExt && isNight) {
-    // EXT NIGHT: Green
-    colorClasses = 'bg-emerald-200 text-emerald-950 border-emerald-300 shadow-emerald-950/20';
-    badgeClasses = 'bg-emerald-300/80 text-emerald-950';
+    // EXT NIGHT: Violet
+    colorClasses = 'bg-violet-200 text-violet-950 border-violet-300 shadow-violet-950/20';
+    badgeClasses = 'bg-violet-300/80 text-violet-950';
   } else {
     // INT NIGHT: Blue
     colorClasses = 'bg-sky-200 text-sky-950 border-sky-300 shadow-sky-950/20';
@@ -102,30 +104,37 @@ export const StripItem: React.FC<StripItemProps> = ({
         </span>
 
         {/* Move / Lock to Day Dropdown */}
-        {onLockScene && (
+        {(onMoveScene || onLockScene) && (
           <div className="flex items-center gap-1 ml-0.5" onClick={(e) => e.stopPropagation()}>
             {scene.locked_day != null ? (
               <div className="flex items-center gap-1 bg-amber-600 text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-sm">
                 <Lock className="w-2.5 h-2.5" />
                 <span>Locked: Day {scene.locked_day}</span>
-                <button
-                  onClick={() => onLockScene(scene.scene_id, null)}
-                  title="Unlock scene (allow optimizer to move)"
-                  className="ml-1 text-amber-200 hover:text-white font-bold"
-                >
-                  Unlock ✕
-                </button>
+                {onLockScene && (
+                  <button
+                    onClick={() => onLockScene(scene.scene_id, null)}
+                    title="Unlock scene (allow optimizer to move)"
+                    className="ml-1 text-amber-200 hover:text-white font-bold"
+                  >
+                    Unlock ✕
+                  </button>
+                )}
               </div>
             ) : (
               <select
                 value=""
                 onChange={(e) => {
                   if (e.target.value) {
-                    onLockScene(scene.scene_id, parseInt(e.target.value, 10));
+                    const target = parseInt(e.target.value, 10);
+                    if (onMoveScene) {
+                      onMoveScene(scene.scene_id, target);
+                    } else if (onLockScene) {
+                      onLockScene(scene.scene_id, target);
+                    }
                   }
                 }}
                 className="text-[10px] font-semibold bg-black/10 hover:bg-black/20 text-slate-900 rounded px-1.5 py-0.5 border border-black/15 cursor-pointer outline-none transition-colors"
-                title="Move and lock this scene to a specific shoot day"
+                title="Move this scene to a specific shoot day (without locking)"
               >
                 <option value="" disabled>
                   Move to...

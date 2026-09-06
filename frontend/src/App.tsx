@@ -22,6 +22,7 @@ import {
   loadPreset,
   solveSchedule,
   lockScene,
+  moveScene,
   clearSchedule,
 } from './services/api';
 import { Scene, Actor, ScheduleSolution, DisruptionAlert, KafkaStatus, UnionAudit } from './types';
@@ -240,6 +241,25 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleMoveScene = async (sceneId: string, targetDay: number) => {
+    setIsSolving(true);
+    try {
+      const updated = await moveScene(sceneId, targetDay);
+      setSolution(updated);
+      const [kStat, uAudit] = await Promise.all([
+        fetchKafkaStatus().catch(() => null),
+        fetchUnionAudit().catch(() => null),
+      ]);
+      setKafkaStatus(kStat);
+      setUnionAudit(uAudit);
+      setError(null);
+    } catch (err: any) {
+      setError('Failed to move scene: ' + err.message);
+    } finally {
+      setIsSolving(false);
+    }
+  };
+
   const handleClearSchedule = async () => {
     setIsSolving(true);
     try {
@@ -354,6 +374,7 @@ export const App: React.FC = () => {
               metrics={solution.metrics}
               disruptions={solution.disruptions_applied}
               status={solution.status}
+              onSelectTab={setActiveTab}
             />
 
             {/* Optimization Status Callout Banner */}
@@ -483,7 +504,11 @@ export const App: React.FC = () => {
 
             {/* Tab Views */}
             {activeTab === 'stripboard' && (
-              <Stripboard days={solution.days} onLockScene={handleLockScene} />
+              <Stripboard
+                days={solution.days}
+                onMoveScene={handleMoveScene}
+                onLockScene={handleLockScene}
+              />
             )}
 
             {activeTab === 'dood' && (

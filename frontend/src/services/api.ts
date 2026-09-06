@@ -110,6 +110,16 @@ export async function solveSchedule(): Promise<ScheduleSolution> {
   return res.json();
 }
 
+export async function moveScene(sceneId: string, targetDay: number): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/move-scene`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scene_id: sceneId, target_day: targetDay }),
+  });
+  if (!res.ok) throw new Error('Failed to move scene');
+  return res.json();
+}
+
 export async function lockScene(sceneId: string, lockedDay: number | null): Promise<ScheduleSolution> {
   const res = await fetch(`${API_BASE}/production/lock-scene`, {
     method: 'POST',

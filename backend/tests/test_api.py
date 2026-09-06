@@ -247,6 +247,40 @@ def test_production_settings():
     assert verify_res.json()["permit_lead_days"] == 2
     assert verify_res.json()["max_minutes_per_day"] == 540
 
+def test_move_scene_without_locking():
+    # Reset to baseline first
+    res = client.post("/api/schedule/reset")
+    assert res.status_code == 200
 
+    # Move scene SC_01 to Day 3
+    move_res = client.post("/api/production/move-scene", json={
+        "scene_id": "SC_01",
+        "target_day": 3
+    })
+    assert move_res.status_code == 200
+    data = move_res.json()
 
+    # Verify scene is on Day 3 but NOT locked
+    day3_scenes = [s for day in data["days"] if day["day_number"] == 3 for s in day["scenes"]]
+    sc_01 = next((s for s in day3_scenes if s["scene_id"] == "SC_01"), None)
+    assert sc_01 is not None
+    assert sc_01.get("locked_day") is None, "Moving scene must not lock it!"
 
+def test_reset_schedule_unlocks_and_restores():
+    # Lock a scene
+    lock_res = client.post("/api/production/lock-scene", json={
+        "scene_id": "SC_02",
+        "locked_day": 4
+    })
+    assert lock_res.status_code == 200
+
+    # Reset
+    reset_res = client.post("/api/schedule/reset")
+    assert reset_res.status_code == 200
+    data = reset_res.json()
+    assert data["status"] in ("OPTIMAL", "FEASIBLE")
+
+    # Verify no scene has locked_day set
+    for day in data["days"]:
+        for s in day["scenes"]:
+            assert s.get("locked_day") is None
