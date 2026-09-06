@@ -53,95 +53,98 @@ export const StripItem: React.FC<StripItemProps> = ({
         e.dataTransfer.setData('text/plain', scene.scene_id);
         e.dataTransfer.effectAllowed = 'move';
       }}
-      className={`rounded-lg border px-3 py-2.5 my-1.5 shadow transition-all hover:scale-[1.01] hover:shadow-md cursor-grab active:cursor-grabbing select-none ${colorClasses}`}
+      className={`rounded-md border px-2.5 py-1.5 my-0.5 shadow-sm transition-all hover:scale-[1.008] hover:shadow-md cursor-grab active:cursor-grabbing select-none flex items-center justify-between gap-2 text-xs ${colorClasses}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        {/* Scene Number & Slugline */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="w-7 h-7 rounded-md bg-black/15 flex items-center justify-center font-black text-sm tracking-tight shrink-0 font-mono">
-            {scene.scene_number}
+      {/* Left & Middle: Scene #, Slugline, Description, and Cast in the main row */}
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        {/* Scene Number */}
+        <span className="w-6 h-6 rounded bg-black/15 flex items-center justify-center font-black text-xs shrink-0 font-mono">
+          {scene.scene_number}
+        </span>
+
+        {/* Slugline */}
+        <span className="font-bold text-xs tracking-tight uppercase font-mono shrink-0">
+          {scene.slugline}
+        </span>
+
+        {/* Short Description */}
+        {scene.description && (
+          <span className="hidden xl:inline text-[11px] opacity-70 truncate max-w-[200px]">
+            {scene.description}
           </span>
-          <div className="min-w-0">
-            <h4 className="font-bold text-xs md:text-sm tracking-tight truncate uppercase font-mono">
-              {scene.slugline}
-            </h4>
-            <p className="text-[11px] opacity-80 truncate">{scene.description}</p>
+        )}
+
+        {/* Cast ID Pills (INLINE ON MAIN ROW) */}
+        {scene.cast_ids && scene.cast_ids.length > 0 && (
+          <div className="hidden sm:flex items-center gap-1 shrink-0 ml-1">
+            <span className="text-[9px] uppercase font-bold opacity-60">Cast:</span>
+            {scene.cast_ids.map((castId) => (
+              <span
+                key={castId}
+                className="px-1.5 py-0.2 rounded bg-black/10 text-[9px] font-bold tracking-tight"
+              >
+                {castId.replace('ACTOR_', '')}
+              </span>
+            ))}
           </div>
-        </div>
-
-        {/* Badges, Metrics & Pin Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {scene.requires_pyro && (
-            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px] font-bold uppercase tracking-wider animate-pulse">
-              <Flame className="w-3 h-3" /> Pyro
-            </span>
-          )}
-
-          <span className={`hidden sm:flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${badgeClasses}`}>
-            <Clock className="w-3 h-3" /> {scene.est_shoot_minutes}m
-          </span>
-
-          <span className={`hidden sm:flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold ${badgeClasses}`}>
-            <File className="w-3 h-3" /> {pageStr} pgs
-          </span>
-
-          {/* Interactive Scene Lock / Pin Override */}
-          {onLockScene && (
-            <div className="flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
-              {scene.locked_day != null ? (
-                <div className="flex items-center gap-1 bg-amber-600 text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-sm">
-                  <Lock className="w-2.5 h-2.5" />
-                  <span>Day {scene.locked_day}</span>
-                  <button
-                    onClick={() => onLockScene(scene.scene_id, null)}
-                    title="Unlock scene (allow optimizer to move)"
-                    className="ml-1 text-amber-200 hover:text-white"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <div className="relative flex items-center">
-                  <select
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        onLockScene(scene.scene_id, parseInt(e.target.value, 10));
-                      }
-                    }}
-                    className="text-[10px] font-semibold bg-black/10 hover:bg-black/20 text-slate-900 rounded px-1.5 py-0.5 border border-black/15 cursor-pointer outline-none transition-colors"
-                    title="Lock scene to day (or drag-and-drop to any day card)"
-                  >
-                    <option value="" disabled>
-                      📌 Pin Day...
-                    </option>
-                    {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => (
-                      <option key={d} value={d}>
-                        Day {d} {d === currentDay ? '(Current)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Cast ID Pills */}
-      {scene.cast_ids && scene.cast_ids.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-1.5 border-t border-black/10">
-          <span className="text-[10px] uppercase font-bold opacity-70">Cast:</span>
-          {scene.cast_ids.map((castId) => (
-            <span
-              key={castId}
-              className="px-1.5 py-0.2 rounded bg-black/10 text-[10px] font-semibold tracking-tight"
-            >
-              {castId.replace('ACTOR_', '')}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Right: Pyro, Duration, Pages, Pin/Lock Override */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {scene.requires_pyro && (
+          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-bold uppercase tracking-wider animate-pulse">
+            <Flame className="w-2.5 h-2.5" /> Pyro
+          </span>
+        )}
+
+        <span className={`hidden md:flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${badgeClasses}`}>
+          <File className="w-2.5 h-2.5" /> {pageStr} pgs
+        </span>
+
+        <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${badgeClasses}`}>
+          <Clock className="w-2.5 h-2.5" /> {scene.est_shoot_minutes}m
+        </span>
+
+        {/* Interactive Scene Lock / Pin Override */}
+        {onLockScene && (
+          <div className="flex items-center gap-1 ml-0.5" onClick={(e) => e.stopPropagation()}>
+            {scene.locked_day != null ? (
+              <div className="flex items-center gap-1 bg-amber-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm">
+                <Lock className="w-2.5 h-2.5" />
+                <span>D{scene.locked_day}</span>
+                <button
+                  onClick={() => onLockScene(scene.scene_id, null)}
+                  title="Unlock scene (allow optimizer to move)"
+                  className="ml-0.5 text-amber-200 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onLockScene(scene.scene_id, parseInt(e.target.value, 10));
+                  }
+                }}
+                className="text-[10px] font-semibold bg-black/10 hover:bg-black/20 text-slate-900 rounded px-1.5 py-0.5 border border-black/15 cursor-pointer outline-none transition-colors"
+                title="Lock scene to day (or drag-and-drop to any day card)"
+              >
+                <option value="" disabled>
+                  📌 Pin...
+                </option>
+                {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={d}>
+                    Day {d} {d === currentDay ? '(Current)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
