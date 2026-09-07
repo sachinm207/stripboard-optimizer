@@ -321,6 +321,25 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleApplySoftLocks = async (stagedSoftLocks: Record<string, number[]>) => {
+    setIsSolving(true);
+    try {
+      const updated = await updateConstraints({ soft_locks: stagedSoftLocks });
+      setSolution(updated);
+      const [kStat, uAudit] = await Promise.all([
+        fetchKafkaStatus().catch(() => null),
+        fetchUnionAudit().catch(() => null),
+      ]);
+      setKafkaStatus(kStat);
+      setUnionAudit(uAudit);
+      setError(null);
+    } catch (err: any) {
+      setError('Failed to apply What-If soft locks: ' + err.message);
+    } finally {
+      setIsSolving(false);
+    }
+  };
+
   const handleClearSoftLocks = async () => {
     setIsSolving(true);
     try {
@@ -587,7 +606,9 @@ export const App: React.FC = () => {
                 softLocks={solution.soft_locks}
                 onSaveConstraints={handleSaveConstraints}
                 onToggleSoftLock={handleToggleSoftLock}
+                onApplySoftLocks={handleApplySoftLocks}
                 onClearSoftLocks={handleClearSoftLocks}
+                onOpenChaos={() => setIsChaosOpen(true)}
                 isSolving={isSolving}
               />
             )}

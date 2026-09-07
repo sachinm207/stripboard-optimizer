@@ -28,7 +28,9 @@ interface AvailabilityMatrixProps {
     dark_days: number[];
   }) => Promise<void>;
   onToggleSoftLock?: (entityId: string, day: number) => Promise<void>;
+  onApplySoftLocks?: (softLocks: Record<string, number[]>) => Promise<void>;
   onClearSoftLocks?: () => Promise<void>;
+  onOpenChaos?: () => void;
   isSolving?: boolean;
 }
 
@@ -43,7 +45,9 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   softLocks = {},
   onSaveConstraints,
   onToggleSoftLock,
+  onApplySoftLocks,
   onClearSoftLocks,
+  onOpenChaos,
   isSolving = false,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'cast' | 'location'>('cast');
@@ -54,6 +58,9 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   const [draftLocationBlackouts, setDraftLocationBlackouts] = useState<Record<string, number[]>>(locationBlackouts);
   const [draftDarkDays, setDraftDarkDays] = useState<number[]>(darkDays);
 
+  // Local staging for What-If exploratory soft locks (batching instead of immediate execution)
+  const [stagedSoftLocks, setStagedSoftLocks] = useState<Record<string, number[]>>(softLocks || {});
+
   // Synchronize when props update (e.g. after solver run)
   useEffect(() => {
     if (!isEditing) {
@@ -63,6 +70,10 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
     }
   }, [actorBlackouts, locationBlackouts, darkDays, isEditing]);
 
+  useEffect(() => {
+    setStagedSoftLocks(softLocks || {});
+  }, [softLocks]);
+
   const daysHeader = Array.from({ length: numDays }, (_, i) => i + 1);
 
   // Extract unique locations from all days
@@ -70,10 +81,12 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
     new Set(days.flatMap((d) => d.scenes.map((s) => s.location)))
   ).sort();
 
-  // Count active soft locks
-  const totalSoftLocks = Object.values(softLocks).reduce((acc, arr) => acc + arr.length, 0);
+  // Compare staged locks with active locks in current schedule
+  const isSoftLockDirty = JSON.stringify(stagedSoftLocks) !== JSON.stringify(softLocks || {});
+  const totalStagedLocks = Object.values(stagedSoftLocks).reduce((acc, arr) => acc + arr.length, 0);
+  const totalActiveLocks = Object.values(softLocks || {}).reduce((acc, arr) => acc + arr.length, 0);
 
-  // Handlers for Draft Mode
+  // Handlers for Draft Mode (Hard Constraints)
   const handleToggleActorDraftBlackout = (actorId: string, day: number) => {
     if (!isEditing) return;
     const current = draftActorBlackouts[actorId] || [];
@@ -115,6 +128,32 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
     setDraftLocationBlackouts(locationBlackouts);
     setDraftDarkDays(darkDays);
     setIsEditing(false);
+  };
+
+  // Handlers for What-If Exploratory Soft Locks (Staged locally, no instant re-solve)
+  const handleToggleStagedSoftLock = (entityId: string, day: number) => {
+    const current = stagedSoftLocks[entityId] || [];
+    const updated = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort((a, b) => a - b);
+
+    const next = { ...stagedSoftLocks };
+    if (updated.length === 0) {
+      delete next[entityId];
+    } else {
+      next[entityId] = updated;
+    }
+    setStagedSoftLocks(next);
+  };
+
+  const handleApplyStagedSoftLocks = async () => {
+    if (onApplySoftLocks) {
+      await onApplySoftLocks(stagedSoftLocks);
+    }
+  };
+
+  const handleDiscardStagedSoftLocks = () => {
+    setStagedSoftLocks(softLocks || {});
   };
 
   // Check if a cell is an active hard blackout
@@ -177,7 +216,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {isEditing ? (
             <>
               <button
@@ -199,15 +238,49 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
             </>
           ) : (
             <>
-              {totalSoftLocks > 0 && onClearSoftLocks && (
+              {/* Staged What-If Optimization Button - User stages multiple pins, then clicks Optimize */}
+              {(isSoftLockDirty || totalStagedLocks > 0) && (
                 <button
-                  onClick={() => onClearSoftLocks()}
+                  onClick={handleApplyStagedSoftLocks}
+                  disabled={isSolving || !isSoftLockDirty}
+                  className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 disabled:opacity-50 disabled:pointer-events-none text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-500/25 transition-all cursor-pointer animate-pulse"
+                  title="Run Google CP-SAT solver with all staged What-If Soft Locks"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>
+                    {isSolving
+                      ? 'Optimizing...'
+                      : isSoftLockDirty
+                      ? `⚡ Optimize What-If (${totalStagedLocks} Pinned)`
+                      : `What-If Optimized (${totalStagedLocks})`}
+                  </span>
+                </button>
+              )}
+
+              {isSoftLockDirty && (
+                <button
+                  onClick={handleDiscardStagedSoftLocks}
+                  disabled={isSolving}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Discard staged pins and revert back to active solution"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Discard Pins</span>
+                </button>
+              )}
+
+              {totalActiveLocks > 0 && onClearSoftLocks && (
+                <button
+                  onClick={async () => {
+                    await onClearSoftLocks();
+                    setStagedSoftLocks({});
+                  }}
                   disabled={isSolving}
                   className="px-3 py-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-800/80 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                   title="Remove all soft exploratory locks"
                 >
                   <Pin className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Clear What-If Locks ({totalSoftLocks})</span>
+                  <span>Clear What-If Locks ({totalActiveLocks})</span>
                 </button>
               )}
 
@@ -216,7 +289,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                   onClick={() => setIsEditing(true)}
                   disabled={isSolving}
                   className="px-4 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                  title="Unlock edit mode to modify legal contract blackouts or city permits"
+                  title="Unlock edit mode to modify legal contract blackouts or pre-planned dark days"
                 >
                   <Edit3 className="w-3.5 h-3.5 text-amber-400" />
                   <span>Edit Hard Constraints</span>
@@ -227,12 +300,108 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
         </div>
       </div>
 
+      {/* Tier 2: DEDICATED PRE-PLANNED DARK DAYS & STATUTORY HIATUS CALENDAR */}
+      <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 shadow-inner">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <div className="flex items-center gap-2">
+              <Moon className="w-4 h-4 text-indigo-400" />
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                🗓️ Pre-Planned Dark Days & Hiatus Calendar (Tier 1 Constraint)
+              </h4>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950 border border-indigo-700 text-indigo-300">
+                Company-Wide
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Pre-schedule statutory rest days, holidays, festivals, or municipal permit freezes. The solver strictly schedules 0 scenes on dark dates.
+            </p>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-2">
+            {!isEditing ? (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-3 py-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/80 text-indigo-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Edit company dark days and actor contract blackouts"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-indigo-300" />
+                <span>Configure Dark Days</span>
+              </button>
+            ) : (
+              <span className="px-2.5 py-1 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-semibold">
+                Click any day pill below to toggle Dark Day
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Day Pills Strip */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5">
+          {daysHeader.map((d) => {
+            const isDark = isDayDark(d);
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => {
+                  if (isEditing) {
+                    handleToggleDraftDarkDay(d);
+                  } else {
+                    setIsEditing(true);
+                  }
+                }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all shrink-0 ${
+                  isDark
+                    ? 'bg-indigo-950 border-indigo-600 text-indigo-200 shadow-md shadow-indigo-950/60 ring-1 ring-indigo-500/30'
+                    : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
+                } cursor-pointer hover:scale-105`}
+                title={
+                  isEditing
+                    ? isDark
+                      ? `Day ${d}: Dark Day (Click to reopen)`
+                      : `Day ${d}: Shoot Day (Click to set as Dark Day)`
+                    : isDark
+                    ? `Day ${d}: Pre-Planned Dark Day (Hiatus). Click to edit.`
+                    : `Day ${d}: Scheduled Shoot Day. Click to edit.`
+                }
+              >
+                <span className={`w-2 h-2 rounded-full ${isDark ? 'bg-indigo-400 animate-pulse' : 'bg-emerald-400'}`} />
+                <span className="font-mono font-bold">Day {d}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    isDark ? 'bg-indigo-900/90 text-indigo-200' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {isDark ? '🌙 Dark / Hiatus' : '🎬 Shoot Day'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Cross-Link notice to Sudden Chaos Off Days */}
+        <div className="text-[11px] text-slate-400 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-2 border-t border-slate-800/60">
+          <span>
+            Looking to simulate an <strong className="text-rose-300">unplanned / sudden emergency day shutdown</strong> (Force Majeure, sudden storm)?
+          </span>
+          {onOpenChaos && (
+            <button
+              onClick={onOpenChaos}
+              className="text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1 hover:underline cursor-pointer self-start sm:self-auto"
+            >
+              <span>Open Throw Chaos (Sudden Day Shutdown) 🚨</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Instructional Guidance Callout */}
       {isEditing ? (
         <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200/90 flex items-start gap-2.5">
           <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="leading-relaxed">
-            <span className="font-bold text-amber-300">Tier 1 Hard Constraints Editing:</span> Click any cell to toggle contractual / permit blackouts (🚫). Click the <strong className="text-white font-mono">[🌙 Dark Day]</strong> button in any column header to declare that entire calendar date a festival/holiday dark day. Click <strong className="text-white">"Save & Re-Optimize"</strong> to batch-commit your changes to the Google CP-SAT solver.
+            <span className="font-bold text-amber-300">Tier 1 Hard Constraints Editing:</span> Click any cell to toggle contractual / permit blackouts (🚫). Click the <strong className="text-white font-mono">[🌙 Dark Day]</strong> button in any column header or the calendar strip above to declare that entire calendar date a festival/holiday dark day. Click <strong className="text-white">"Save & Re-Optimize"</strong> to batch-commit your changes to the Google CP-SAT solver.
           </div>
         </div>
       ) : (
@@ -240,7 +409,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
           <div className="flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             <span>
-              <strong className="text-slate-200">Tier 3 What-If Exploration:</strong> In Read Mode, click on any available day to toggle a temporary <span className="text-sky-300 font-bold">What-If Lock (📌)</span>. The solver prioritizes it without altering legally binding contracts.
+              <strong className="text-slate-200">Tier 3 What-If Exploration:</strong> Click available cells to stage temporary <span className="text-sky-300 font-bold">What-If Locks (📌)</span>. When ready, click <strong className="text-white font-semibold">"⚡ Optimize What-If Scenario"</strong> above to test your hypothesis.
             </span>
           </div>
           <div className="flex items-center gap-3 shrink-0 text-[10px]">
@@ -315,7 +484,8 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                     const code = row.day_codes[idx] || '-';
                     const isDark = isDayDark(d);
                     const isBlackout = isActorBlackout(row.actor_id, d);
-                    const isSoftLocked = softLocks[row.actor_id]?.includes(d);
+                    const isStaged = stagedSoftLocks[row.actor_id]?.includes(d);
+                    const isAlreadyActive = softLocks[row.actor_id]?.includes(d);
 
                     let content: React.ReactNode = code;
                     let cellClass = 'bg-slate-800/40 text-slate-500 border-transparent';
@@ -326,13 +496,16 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                     } else if (isBlackout) {
                       content = '🚫';
                       cellClass = 'bg-rose-950/80 text-rose-300 border-rose-700/80 font-bold';
-                    } else if (isSoftLocked) {
+                    } else if (isStaged) {
                       content = (
                         <span className="flex items-center gap-0.5">
-                          <Pin className="w-2.5 h-2.5 text-sky-400 fill-current" /> {code}
+                          <Pin className={`w-2.5 h-2.5 fill-current ${isAlreadyActive ? 'text-sky-400' : 'text-amber-400 animate-pulse'}`} />
+                          <span>{code}</span>
                         </span>
                       );
-                      cellClass = 'bg-sky-950/80 text-sky-300 border-sky-600/80 font-bold shadow-sm shadow-sky-500/20';
+                      cellClass = isAlreadyActive
+                        ? 'bg-sky-950/80 text-sky-300 border-sky-600/80 font-bold shadow-sm shadow-sky-500/20'
+                        : 'bg-amber-950/70 text-amber-200 border-amber-400 font-bold shadow-sm ring-1 ring-amber-400/40';
                     } else if (code === 'W') {
                       cellClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 font-bold';
                     } else if (code === 'H') {
@@ -349,8 +522,8 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                           onClick={() => {
                             if (isEditing) {
                               handleToggleActorDraftBlackout(row.actor_id, d);
-                            } else if (!isDark && !isBlackout && onToggleSoftLock) {
-                              onToggleSoftLock(row.actor_id, d);
+                            } else if (!isDark && !isBlackout) {
+                              handleToggleStagedSoftLock(row.actor_id, d);
                             }
                           }}
                           title={
@@ -360,9 +533,9 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                               ? `Day ${d} is a company-wide dark day`
                               : isBlackout
                               ? `Contractually unavailable (Blackout)`
-                              : isSoftLocked
-                              ? `Click to remove What-If Soft Lock on Day ${d}`
-                              : `Click to test What-If Soft Lock on Day ${d}`
+                              : isStaged
+                              ? `Click to unpin Day ${d} (What-If)`
+                              : `Click to pin Day ${d} (What-If staged)`
                           }
                           className={`w-9 h-8 rounded-md border text-xs flex items-center justify-center transition-all ${cellClass} ${
                             isEditing
@@ -461,7 +634,8 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                       const scenesCount = daySchedule?.scenes.filter((s) => s.location === loc).length || 0;
                       const isDark = isDayDark(d);
                       const isBlackout = isLocationBlackout(loc, d);
-                      const isSoftLocked = softLocks[loc]?.includes(d);
+                      const isStaged = stagedSoftLocks[loc]?.includes(d);
+                      const isAlreadyActive = softLocks[loc]?.includes(d);
 
                       let cellContent: React.ReactNode = '—';
                       let cellClass = 'bg-slate-800/30 text-slate-500 border-transparent';
@@ -472,14 +646,16 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                       } else if (isBlackout) {
                         cellContent = '🚫';
                         cellClass = 'bg-rose-950/80 text-rose-300 border-rose-700/80 font-bold';
-                      } else if (isSoftLocked) {
+                      } else if (isStaged) {
                         cellContent = (
                           <span className="flex items-center gap-0.5">
-                            <Pin className="w-2.5 h-2.5 text-sky-400 fill-current" />
+                            <Pin className={`w-2.5 h-2.5 fill-current ${isAlreadyActive ? 'text-sky-400' : 'text-amber-400 animate-pulse'}`} />
                             <span>{isShootingHere ? `${scenesCount}sc` : 'Pin'}</span>
                           </span>
                         );
-                        cellClass = 'bg-sky-950/80 text-sky-300 border-sky-600 font-bold shadow-sm';
+                        cellClass = isAlreadyActive
+                          ? 'bg-sky-950/80 text-sky-300 border-sky-600 font-bold shadow-sm'
+                          : 'bg-amber-950/70 text-amber-200 border-amber-400 font-bold shadow-sm ring-1 ring-amber-400/40';
                       } else if (isShootingHere) {
                         cellContent = `${scenesCount} sc`;
                         cellClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold';
@@ -493,8 +669,8 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                             onClick={() => {
                               if (isEditing) {
                                 handleToggleLocationDraftBlackout(loc, d);
-                              } else if (!isDark && !isBlackout && onToggleSoftLock) {
-                                onToggleSoftLock(loc, d);
+                              } else if (!isDark && !isBlackout) {
+                                handleToggleStagedSoftLock(loc, d);
                               }
                             }}
                             title={
@@ -504,9 +680,9 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                                 ? `Day ${d} is a dark day (no shooting)`
                                 : isBlackout
                                 ? `Permit Restricted (Blackout on Day ${d})`
-                                : isSoftLocked
-                                ? `Click to remove What-If Soft Lock on Day ${d}`
-                                : `Click to test What-If Soft Lock on Day ${d}`
+                                : isStaged
+                                ? `Click to unpin Day ${d} for ${loc} (What-If)`
+                                : `Click to pin Day ${d} for ${loc} (What-If staged)`
                             }
                             className={`w-12 h-8 rounded-md border text-[11px] flex items-center justify-center transition-all ${cellClass} ${
                               isEditing

@@ -33,6 +33,8 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
   const [selectedDays, setSelectedDays] = useState<number[]>([2]);
   const [reason, setReason] = useState('Emergency medical isolation (48h)');
   const [stagedAlerts, setStagedAlerts] = useState<DisruptionAlert[]>([]);
+  const [shutdownDay, setShutdownDay] = useState<number>(3);
+  const [shutdownReason, setShutdownReason] = useState<string>('Emergency Force Majeure: Citywide flash flood warning and municipal curfew');
 
   if (!isOpen) return null;
 
@@ -209,15 +211,97 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             <button
               onClick={() => triggerPreset('EMERGENCY_DAY_SHUTDOWN')}
               disabled={isSolving}
-              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-indigo-500/30 hover:border-indigo-500/60 transition-all flex items-start gap-3 group cursor-pointer"
+              className="w-full text-left p-3 rounded-lg bg-indigo-950/40 hover:bg-indigo-950/70 border border-indigo-500/50 hover:border-indigo-400 transition-all flex items-start gap-3 group cursor-pointer ring-1 ring-indigo-500/20"
             >
               <Moon className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
               <div>
-                <div className="font-semibold text-xs text-white">Sudden Day Shutdown (Force Majeure)</div>
-                <p className="text-[11px] text-slate-400 mt-0.5">Day 3 closed by emergency city curfew</p>
+                <div className="font-semibold text-xs text-white flex items-center gap-1.5">
+                  <span>Sudden Day Shutdown (Force Majeure)</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/30 text-indigo-300 font-bold border border-indigo-500/40">
+                    Preset
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">Preset: Day 3 evacuated and locked down by city curfew</p>
               </div>
             </button>
           </div>
+        </div>
+
+        {/* DEDICATED SUDDEN EMERGENCY DAY SHUTDOWN SECTION */}
+        <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-950/50 via-slate-900 to-rose-950/40 border-2 border-rose-500/50 shadow-xl space-y-3 my-1">
+          <div className="flex items-start gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0 mt-0.5">
+              <Moon className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                  🚨 Sudden Day Shutdown
+                </h4>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">
+                  Force Majeure
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                Instantly evacuate any shooting day due to sudden disasters, curfews, or strikes.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1.5">
+              Select Day to Evacuate & Lock Down:
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5 max-h-28 overflow-y-auto p-1 bg-slate-950/70 rounded-lg border border-slate-800">
+              {daysList.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setShutdownDay(d)}
+                  className={`px-2.5 py-1 rounded border text-xs font-bold transition-all cursor-pointer ${
+                    shutdownDay === d
+                      ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-600/40 scale-105'
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:border-slate-600'
+                  }`}
+                >
+                  Day {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] text-slate-400 font-medium mb-1">
+              Shutdown Reason:
+            </label>
+            <input
+              type="text"
+              value={shutdownReason}
+              onChange={(e) => setShutdownReason(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500"
+            />
+          </div>
+
+          <button
+            type="button"
+            disabled={isSolving}
+            onClick={() => {
+              onInject({
+                alert_id: `alert_shutdown_${Date.now()}`,
+                production_id: 'prod_neon_horizon',
+                disruption_type: 'DAY_SHUTDOWN',
+                severity: 'CRITICAL',
+                affected_shoot_days: [shutdownDay],
+                reason: shutdownReason || `Force Majeure: Emergency Day ${shutdownDay} Shutdown`,
+              });
+            }}
+            className="w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 active:scale-98 text-white text-xs font-bold transition-all shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Moon className="w-4 h-4" />
+            <span>
+              {isSolving ? 'Evacuating Day...' : `🚨 Evacuate Day ${shutdownDay} & Reschedule Production`}
+            </span>
+          </button>
         </div>
 
         {/* Custom Chaos Form */}
