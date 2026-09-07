@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clapperboard, Cpu, Sparkles, Radio, Flame, FileText, RotateCcw, Upload, Sliders, Home, History } from 'lucide-react';
+import { Clapperboard, Cpu, Sparkles, Radio, Flame, FileText, RotateCcw, Upload, Sliders, Home, History, Zap } from 'lucide-react';
 import { KafkaStatus } from '../types';
 
 interface NavbarProps {
@@ -14,6 +14,8 @@ interface NavbarProps {
   onReset: () => void;
   onClear?: () => void;
   onSwitchPreset?: (presetId: string) => void;
+  onSolve?: () => void;
+  isPendingOptimization?: boolean;
   isSolving?: boolean;
 }
 
@@ -29,6 +31,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onReset,
   onClear,
   onSwitchPreset,
+  onSolve,
+  isPendingOptimization = false,
   isSolving = false,
 }) => {
   return (
@@ -75,6 +79,26 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center gap-3">
           {hasProduction && (
             <>
+              {/* HERO OPTIMIZE SCHEDULE BUTTON: Prominent button to run Google OR-Tools CP-SAT */}
+              {onSolve && (
+                <button
+                  onClick={onSolve}
+                  disabled={isSolving}
+                  className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black tracking-wider uppercase shadow-xl transition-all cursor-pointer ${
+                    isPendingOptimization
+                      ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-amber-500 hover:from-emerald-400 hover:to-amber-400 text-slate-950 ring-2 ring-emerald-400 animate-pulse shadow-emerald-950/80 scale-105'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/50 hover:scale-102 active:scale-98'
+                  }`}
+                  title="Run Google OR-Tools CP-SAT solver to compute globally optimal production schedule"
+                >
+                  <Zap className={`w-4 h-4 text-amber-300 fill-current ${isSolving ? 'animate-bounce' : ''}`} />
+                  <span>{isSolving ? 'Optimizing...' : '⚡ Optimize Schedule'}</span>
+                  {isPendingOptimization && (
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  )}
+                </button>
+              )}
+
               {/* HERO THROW CHAOS BUTTON: Bold, Pulsing, High Visibility Emergency Action */}
               <button
                 onClick={onOpenChaos}

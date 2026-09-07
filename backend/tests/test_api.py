@@ -49,7 +49,14 @@ def test_inject_disruption_and_reschedule():
     }
     response = client.post("/api/schedule/disrupt", json=payload)
     assert response.status_code == 200
-    solution = response.json()
+    staged = response.json()
+    assert staged["status"] == "PENDING_OPTIMIZATION"
+    assert any(d["alert_id"] == "test_alert_covid" for d in staged["disruptions_applied"])
+
+    # User clicks Optimize Schedule button
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    solution = solve_res.json()
     assert solution["status"] in ("OPTIMAL", "FEASIBLE")
 
     # Day 3 should not have Marcus
@@ -222,8 +229,13 @@ def test_batch_disruptions():
     res = client.post("/api/schedule/disrupt-batch", json={"alerts": alerts})
     assert res.status_code == 200
     sol = res.json()
-    assert sol["status"] in ("OPTIMAL", "FEASIBLE")
+    assert sol["status"] == "PENDING_OPTIMIZATION"
     assert len(sol["disruptions_applied"]) >= 2
+
+    # User optimizes
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    assert solve_res.json()["status"] in ("OPTIMAL", "FEASIBLE")
 
 def test_production_settings():
     res = client.get("/api/production/settings")
@@ -240,7 +252,7 @@ def test_production_settings():
     })
     assert update_res.status_code == 200
     sol = update_res.json()
-    assert sol["status"] in ("OPTIMAL", "FEASIBLE")
+    assert sol["status"] == "PENDING_OPTIMIZATION"
 
     verify_res = client.get("/api/production/settings")
     assert verify_res.json()["w_turnaround"] == 30000
@@ -273,15 +285,22 @@ def test_reset_schedule_unlocks_and_restores():
         "locked_day": 4
     })
     assert lock_res.status_code == 200
+    assert lock_res.json()["status"] == "PENDING_OPTIMIZATION"
 
     # Reset
     reset_res = client.post("/api/schedule/reset")
     assert reset_res.status_code == 200
     data = reset_res.json()
-    assert data["status"] in ("OPTIMAL", "FEASIBLE")
+    assert data["status"] == "PENDING_OPTIMIZATION"
+
+    # User clicks Optimize Schedule
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    sol = solve_res.json()
+    assert sol["status"] in ("OPTIMAL", "FEASIBLE")
 
     # Verify no scene has locked_day set
-    for day in data["days"]:
+    for day in sol["days"]:
         for s in day["scenes"]:
             assert s.get("locked_day") is None
 
@@ -301,7 +320,13 @@ def test_constraints_get_and_post():
         "dark_days": []
     })
     assert post_res.status_code == 200
-    sol = post_res.json()
+    staged = post_res.json()
+    assert staged["status"] == "PENDING_OPTIMIZATION"
+
+    # User clicks Optimize
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    sol = solve_res.json()
     assert sol["status"] in ("OPTIMAL", "FEASIBLE")
 
     # Verify Sarah is NOT scheduled on Day 2
@@ -316,7 +341,12 @@ def test_planned_dark_day_cascade():
         "dark_days": [3]
     })
     assert res.status_code == 200
-    sol = res.json()
+    assert res.json()["status"] == "PENDING_OPTIMIZATION"
+
+    # User clicks Optimize
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    sol = solve_res.json()
 
     day3 = next(d for d in sol["days"] if d["day_number"] == 3)
     assert day3["is_dark_day"] is True
@@ -335,7 +365,12 @@ def test_sudden_emergency_day_shutdown():
         "reason": "Emergency flood curfew"
     })
     assert alert_res.status_code == 200
-    sol = alert_res.json()
+    assert alert_res.json()["status"] == "PENDING_OPTIMIZATION"
+
+    # User clicks Optimize
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    sol = solve_res.json()
 
     day2 = next(d for d in sol["days"] if d["day_number"] == 2)
     assert day2["is_dark_day"] is True
@@ -350,12 +385,15 @@ def test_soft_locks_toggle_and_clear():
     })
     assert toggle_res.status_code == 200
     sol = toggle_res.json()
+    assert sol["status"] == "PENDING_OPTIMIZATION"
     assert 1 in sol["soft_locks"].get("ACTOR_SARAH", [])
 
     # Clear soft locks
     clear_res = client.post("/api/production/clear-soft-locks")
     assert clear_res.status_code == 200
     sol_cleared = clear_res.json()
+    assert sol_cleared["status"] == "PENDING_OPTIMIZATION"
+    assert len(sol_cleared.get("soft_locks", {})) == 0
     assert len(sol_cleared.get("soft_locks", {})) == 0
 
 def test_versions_save_restore_diff():
@@ -440,7 +478,12 @@ def test_versions_save_restore_diff():
     restore_res = client.post(f"/api/versions/{v_saved_id}/restore")
     assert restore_res.status_code == 200
     restored_sol = restore_res.json()
-    assert restored_sol["status"] in ["OPTIMAL", "FEASIBLE"]
+    assert restored_sol["status"] == "PENDING_OPTIMIZATION"
+
+    # User clicks Optimize
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    assert solve_res.json()["status"] in ["OPTIMAL", "FEASIBLE"]
 
 
 

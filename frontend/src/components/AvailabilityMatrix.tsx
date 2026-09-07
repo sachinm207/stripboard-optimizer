@@ -13,6 +13,7 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
+  Zap,
 } from 'lucide-react';
 
 interface AvailabilityMatrixProps {
@@ -33,6 +34,7 @@ interface AvailabilityMatrixProps {
   onApplySoftLocks?: (softLocks: Record<string, number[]>) => Promise<void>;
   onClearSoftLocks?: () => Promise<void>;
   onOpenChaos?: () => void;
+  onSolve?: () => void;
   isSolving?: boolean;
 }
 
@@ -50,6 +52,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   onApplySoftLocks,
   onClearSoftLocks,
   onOpenChaos,
+  onSolve,
   isSolving = false,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'cast' | 'location'>('cast');
@@ -288,11 +291,23 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                 className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition-all cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>{isSolving ? 'Saving...' : 'Save Blackouts & Re-Optimize'}</span>
+                <span>{isSolving ? 'Saving...' : 'Save Blackouts'}</span>
               </button>
             </>
           ) : (
             <>
+              {onSolve && (
+                <button
+                  onClick={onSolve}
+                  disabled={isSolving}
+                  className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition-all cursor-pointer"
+                  title="Run Google CP-SAT solver with all current constraints"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-300 fill-current" />
+                  <span>{isSolving ? 'Optimizing...' : '⚡ Optimize Schedule'}</span>
+                </button>
+              )}
+
               {/* Staged What-If Optimization Button - User stages multiple pins, then clicks Optimize */}
               {(isSoftLockDirty || totalStagedLocks > 0) && (
                 <button
@@ -580,7 +595,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
         <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200/90 flex items-start gap-2.5">
           <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="leading-relaxed">
-            <span className="font-bold text-amber-300">Editing Contract & Permit Blackouts:</span> Click any matrix cell to toggle actor contract blackouts or location permit restrictions (🚫). Pre-planned company dark days are managed separately in the Calendar above. Click <strong className="text-white">"Save Blackouts & Re-Optimize"</strong> to batch-commit your changes to the Google CP-SAT solver.
+            <span className="font-bold text-amber-300">Editing Contract & Permit Blackouts:</span> Click any matrix cell to toggle actor contract blackouts or location permit restrictions (🚫). Pre-planned company dark days are managed separately in the Calendar above. Click <strong className="text-white">"Save Blackouts"</strong> to stage your changes, then click <strong className="text-emerald-300">"⚡ Optimize Schedule"</strong> when ready to solve the stripboard.
           </div>
         </div>
       ) : (

@@ -442,6 +442,8 @@ export const App: React.FC = () => {
         onReset={handleReset}
         onClear={handleClearSchedule}
         onSwitchPreset={(id) => handleLoadPreset(id, false)}
+        onSolve={handleSolveSchedule}
+        isPendingOptimization={solution?.status === 'PENDING_OPTIMIZATION' || solution?.status === 'RAW_UNOPTIMIZED'}
         isSolving={isSolving}
       />
 
@@ -464,7 +466,37 @@ export const App: React.FC = () => {
             />
 
             {/* Optimization Status Callout Banner */}
-            {solution.status === 'RAW_UNOPTIMIZED' ? (
+            {solution.status === 'PENDING_OPTIMIZATION' ? (
+              <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-emerald-500/20 border border-amber-500/50 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 text-amber-400">
+                    <Zap className="w-5 h-5 text-amber-400 fill-current animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-white tracking-tight">
+                        Schedule Changes Staged (Pending Optimization)
+                      </h3>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                        Awaiting CP-SAT Solve
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                      Company dark days, actor blackouts, location permits, or chaos disruptions have been modified.
+                      The optimizer does not recalculate automatically. Review your modifications and click below to run Google OR-Tools CP-SAT.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSolveSchedule}
+                  disabled={isSolving}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-amber-500 hover:from-emerald-400 hover:to-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-500/30 hover:scale-[1.03] active:scale-[0.97] transition-all shrink-0 cursor-pointer ring-2 ring-emerald-400/50"
+                >
+                  <Zap className="w-4 h-4 text-slate-950 fill-current" />
+                  <span>{isSolving ? 'Optimizing Stripboard...' : '⚡ Optimize Schedule Now'}</span>
+                </button>
+              </div>
+            ) : solution.status === 'RAW_UNOPTIMIZED' ? (
               <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 border border-amber-500/40 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex items-start gap-3.5">
                   <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400">
@@ -612,6 +644,7 @@ export const App: React.FC = () => {
                 onApplySoftLocks={handleApplySoftLocks}
                 onClearSoftLocks={handleClearSoftLocks}
                 onOpenChaos={() => setIsChaosOpen(true)}
+                onSolve={handleSolveSchedule}
                 isSolving={isSolving}
               />
             )}
@@ -873,6 +906,7 @@ export const App: React.FC = () => {
         actors={actors}
         scenes={scenes}
         numDays={solution?.days.length || 5}
+        onSolve={handleSolveSchedule}
         isSolving={isSolving}
       />
 

@@ -180,12 +180,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               type="submit"
               disabled={isSaving || loading}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-900/20 transition-all"
+              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-900/20 transition-all cursor-pointer"
             >
               <CheckCircle className="w-4 h-4" />
-              <span>{isSaving ? 'Re-Optimizing Schedule...' : 'Apply Rules & Re-Optimize'}</span>
+              <span>{isSaving ? 'Saving Rules...' : 'Apply Rules & Policies'}</span>
             </button>
           </div>
+          <p className="text-[10px] text-slate-400 text-right">
+            Policy updates are saved immediately. Click <strong className="text-emerald-400">"⚡ Optimize Schedule"</strong> on the board when ready to solve.
+          </p>
         </form>
       </div>
     </div>

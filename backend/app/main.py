@@ -424,20 +424,16 @@ async def lock_scene_to_day(req: LockSceneRequest):
             s.locked_day = req.locked_day
             break
 
-    solver = StripboardSolver(
-        scenes=STATE["scenes"],
-        actors=STATE["actors"],
-        num_days=STATE["num_days"],
-        max_minutes_per_day=STATE["max_minutes_per_day"],
-        w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
-    )
-    solution = solver.solve(disruptions=STATE["active_disruptions"], naive_cost=STATE.get("naive_cost", None))
-    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+    if STATE.get("current_solution"):
+        for d in STATE["current_solution"].days:
+            for sc in d.scenes:
+                if sc.scene_id == req.scene_id:
+                    sc.locked_day = req.locked_day
+        STATE["current_solution"].status = "PENDING_OPTIMIZATION"
+        await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+        return STATE["current_solution"]
+
+    raise HTTPException(status_code=400, detail="No active schedule loaded to lock scene.")
 
 class MoveSceneRequest(BaseModel):
     scene_id: str
@@ -560,11 +556,11 @@ async def update_production_settings(req: SettingsUpdateRequest):
     if req.max_minutes_per_day is not None:
         STATE["max_minutes_per_day"] = req.max_minutes_per_day
 
-    solution = run_solver()
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+    if STATE.get("current_solution"):
+        STATE["current_solution"].status = "PENDING_OPTIMIZATION"
+        await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+        return STATE["current_solution"]
+    raise HTTPException(status_code=400, detail="No active schedule loaded.")
 
 class UpdateConstraintsRequest(BaseModel):
     actor_blackouts: Optional[Dict[str, List[int]]] = None
@@ -592,11 +588,23 @@ async def update_production_constraints(req: UpdateConstraintsRequest):
     if req.soft_locks is not None:
         STATE["soft_locks"] = req.soft_locks
 
-    solution = run_solver()
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+    if STATE.get("current_solution"):
+        STATE["current_solution"].actor_blackouts = STATE.get("actor_blackouts", {})
+        STATE["current_solution"].location_blackouts = STATE.get("location_blackouts", {})
+        STATE["current_solution"].dark_days = list(STATE.get("dark_days", []))
+        STATE["current_solution"].soft_locks = STATE.get("soft_locks", {})
+        for d in STATE["current_solution"].days:
+            if d.day_number in STATE["dark_days"]:
+                d.is_dark_day = True
+                if not d.dark_day_reason:
+                    d.dark_day_reason = "Pre-planned Hiatus / Dark Day"
+            elif not any(a.disruption_type == "DAY_SHUTDOWN" and d.day_number in a.affected_shoot_days for a in STATE.get("active_disruptions", [])):
+                d.is_dark_day = False
+                d.dark_day_reason = None
+        STATE["current_solution"].status = "PENDING_OPTIMIZATION"
+        await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+        return STATE["current_solution"]
+    raise HTTPException(status_code=400, detail="No active schedule loaded.")
 
 class ToggleSoftLockRequest(BaseModel):
     entity_id: str
@@ -621,20 +629,22 @@ async def toggle_soft_lock(req: ToggleSoftLockRequest):
         else:
             entity_days.append(req.day)
 
-    solution = run_solver()
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+    if STATE.get("current_solution"):
+        STATE["current_solution"].soft_locks = STATE.get("soft_locks", {})
+        STATE["current_solution"].status = "PENDING_OPTIMIZATION"
+        await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+        return STATE["current_solution"]
+    raise HTTPException(status_code=400, detail="No active schedule loaded.")
 
 @app.post("/api/production/clear-soft-locks", response_model=ScheduleSolution)
 async def clear_soft_locks():
     STATE["soft_locks"] = {}
-    solution = run_solver()
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+    if STATE.get("current_solution"):
+        STATE["current_solution"].soft_locks = {}
+        STATE["current_solution"].status = "PENDING_OPTIMIZATION"
+        await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+        return STATE["current_solution"]
+    raise HTTPException(status_code=400, detail="No active schedule loaded.")
 
 class SolveRequest(BaseModel):
     disruptions: Optional[List[DisruptionAlert]] = None
@@ -644,18 +654,12 @@ class SolveRequest(BaseModel):
 @app.post("/api/schedule/solve", response_model=ScheduleSolution)
 async def solve_schedule(request: Optional[SolveRequest] = None):
     disruptions = (request.disruptions if request and request.disruptions is not None else STATE["active_disruptions"])
-    w_turnaround = (request.w_turnaround if request and request.w_turnaround is not None else STATE["w_turnaround"])
-    permit_lead_days = (request.permit_lead_days if request and request.permit_lead_days is not None else STATE["permit_lead_days"])
+    if request and request.w_turnaround is not None:
+        STATE["w_turnaround"] = request.w_turnaround
+    if request and request.permit_lead_days is not None:
+        STATE["permit_lead_days"] = request.permit_lead_days
 
-    solver = StripboardSolver(
-        scenes=STATE["scenes"],
-        actors=STATE["actors"],
-        num_days=STATE["num_days"],
-        max_minutes_per_day=STATE["max_minutes_per_day"],
-        w_turnaround=w_turnaround,
-        permit_lead_days=permit_lead_days
-    )
-    solution = solver.solve(disruptions=disruptions, naive_cost=STATE.get("naive_cost", None))
+    solution = run_solver(disruptions=disruptions)
     if solution.status == "INFEASIBLE":
         raise HTTPException(status_code=422, detail="No feasible schedule found satisfying all constraints.")
 
@@ -670,11 +674,17 @@ async def inject_disruption(alert: DisruptionAlert):
     STATE["active_disruptions"].append(alert)
     await event_bus.publish("schedule.disruption.alert", alert.model_dump())
 
-    solution = run_solver(disruptions=STATE["active_disruptions"])
-    solution.executive_memo = memo_agent.generate_memo(solution, disruption_reason=alert.reason, use_ai=False)
-    STATE["current_solution"] = solution
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+    if STATE.get("current_solution"):
+        STATE["current_solution"].disruptions_applied = list(STATE["active_disruptions"])
+        STATE["current_solution"].status = "PENDING_OPTIMIZATION"
+        for day_num in alert.affected_shoot_days:
+            for d in STATE["current_solution"].days:
+                if d.day_number == day_num and alert.disruption_type == "DAY_SHUTDOWN":
+                    d.is_dark_day = True
+                    d.dark_day_reason = f"Emergency Shutdown: {alert.reason}"
+        await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+        return STATE["current_solution"]
+    raise HTTPException(status_code=400, detail="No active schedule loaded.")
 
 class DisruptBatchRequest(BaseModel):
     alerts: List[DisruptionAlert]
@@ -685,12 +695,19 @@ async def inject_disruption_batch(req: DisruptBatchRequest):
         STATE["active_disruptions"].append(alert)
         await event_bus.publish("schedule.disruption.alert", alert.model_dump())
 
-    solution = run_solver(disruptions=STATE["active_disruptions"])
-    summary_reasons = "; ".join([a.reason for a in req.alerts])
-    solution.executive_memo = memo_agent.generate_memo(solution, disruption_reason=summary_reasons, use_ai=False)
-    STATE["current_solution"] = solution
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+    if STATE.get("current_solution"):
+        STATE["current_solution"].disruptions_applied = list(STATE["active_disruptions"])
+        STATE["current_solution"].status = "PENDING_OPTIMIZATION"
+        for alert in req.alerts:
+            if alert.disruption_type == "DAY_SHUTDOWN":
+                for day_num in alert.affected_shoot_days:
+                    for d in STATE["current_solution"].days:
+                        if d.day_number == day_num:
+                            d.is_dark_day = True
+                            d.dark_day_reason = f"Emergency Shutdown: {alert.reason}"
+        await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+        return STATE["current_solution"]
+    raise HTTPException(status_code=400, detail="No active schedule loaded.")
 
 @app.post("/api/schedule/reset", response_model=ScheduleSolution)
 async def reset_schedule():
@@ -701,11 +718,22 @@ async def reset_schedule():
     STATE["location_blackouts"] = {}
     for s in STATE["scenes"]:
         s.locked_day = None
-    solution = run_solver(disruptions=[])
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+
+    if STATE.get("current_solution"):
+        STATE["current_solution"].disruptions_applied = []
+        STATE["current_solution"].soft_locks = {}
+        STATE["current_solution"].dark_days = []
+        STATE["current_solution"].actor_blackouts = {}
+        STATE["current_solution"].location_blackouts = {}
+        for d in STATE["current_solution"].days:
+            d.is_dark_day = False
+            d.dark_day_reason = None
+            for s in d.scenes:
+                s.locked_day = None
+        STATE["current_solution"].status = "PENDING_OPTIMIZATION"
+        await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+        return STATE["current_solution"]
+    raise HTTPException(status_code=400, detail="No active schedule loaded.")
 
 @app.post("/api/memo/generate")
 async def generate_gemini_memo():
@@ -778,12 +806,26 @@ async def restore_version(version_id: str):
     STATE["dark_days"] = list(target_v.dark_days)
     STATE["active_disruptions"] = [d.model_copy(deep=True) for d in target_v.active_disruptions]
 
-    solution = run_solver(disruptions=STATE["active_disruptions"])
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
+    if STATE.get("current_solution"):
+        STATE["current_solution"].actor_blackouts = {k: list(val) for k, val in STATE["actor_blackouts"].items()}
+        STATE["current_solution"].location_blackouts = {k: list(val) for k, val in STATE["location_blackouts"].items()}
+        STATE["current_solution"].dark_days = list(STATE["dark_days"])
+        STATE["current_solution"].disruptions_applied = list(STATE["active_disruptions"])
+        for d in STATE["current_solution"].days:
+            if d.day_number in STATE["dark_days"]:
+                d.is_dark_day = True
+                d.dark_day_reason = "Restored Hiatus / Dark Day"
+            elif any(a.disruption_type == "DAY_SHUTDOWN" and d.day_number in a.affected_shoot_days for a in STATE["active_disruptions"]):
+                d.is_dark_day = True
+                d.dark_day_reason = "Restored Emergency Shutdown"
+            else:
+                d.is_dark_day = False
+                d.dark_day_reason = None
+        STATE["current_solution"].status = "PENDING_OPTIMIZATION"
+        await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+        return STATE["current_solution"]
 
-    await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
-    return STATE["current_solution"]
+    raise HTTPException(status_code=400, detail="No active schedule loaded.")
 
 @app.delete("/api/versions/{version_id}")
 def delete_version(version_id: str):

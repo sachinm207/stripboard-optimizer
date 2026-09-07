@@ -12,6 +12,7 @@ interface CostMeterProps {
 export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, status, onSelectTab }) => {
   const isCompliant = metrics.total_turnaround_violations === 0;
   const isRaw = status === 'RAW_UNOPTIMIZED';
+  const isPending = status === 'PENDING_OPTIMIZATION';
 
   let savingsTitle = 'Schedule Baseline';
   let savingsValue = 'Nominal Clean';
@@ -19,7 +20,13 @@ export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, stat
   let savingsBorder = 'border-emerald-500/30';
   let savingsTextColor = 'text-emerald-400';
 
-  if (isRaw) {
+  if (isPending) {
+    savingsTitle = 'Staged Changes';
+    savingsValue = 'Pending Solve';
+    savingsSubtitle = 'Click ⚡ Optimize Schedule';
+    savingsBorder = 'border-amber-500/60 shadow-amber-500/20 animate-pulse';
+    savingsTextColor = 'text-amber-300';
+  } else if (isRaw) {
     savingsTitle = 'Script Baseline';
     savingsValue = '$0 Saved';
     savingsSubtitle = 'Unoptimized script order';
@@ -62,10 +69,10 @@ export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, stat
           <Clock className="w-4 h-4 text-sky-400" />
         </div>
         <div className="text-xl lg:text-2xl font-black text-white tracking-tight font-mono">
-          {isRaw ? '--' : metrics.solver_runtime_ms} <span className="text-xs font-normal text-slate-400">ms</span>
+          {isRaw || isPending ? '--' : metrics.solver_runtime_ms} <span className="text-xs font-normal text-slate-400">ms</span>
         </div>
         <p className="text-[11px] text-sky-400/80 font-mono mt-0.5">
-          {isRaw ? 'Awaiting solve trigger' : 'Exact satisfaction'}
+          {isPending ? 'Re-optimization needed' : isRaw ? 'Awaiting solve trigger' : 'Exact satisfaction'}
         </p>
       </div>
 
