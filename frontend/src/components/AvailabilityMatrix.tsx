@@ -52,10 +52,13 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'cast' | 'location'>('cast');
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingDarkDays, setIsEditingDarkDays] = useState(false);
 
-  // Draft state for edits
+  // Draft state for matrix blackouts (Actor contracts & Location permits)
   const [draftActorBlackouts, setDraftActorBlackouts] = useState<Record<string, number[]>>(actorBlackouts);
   const [draftLocationBlackouts, setDraftLocationBlackouts] = useState<Record<string, number[]>>(locationBlackouts);
+
+  // Draft state for pre-planned dark days calendar
   const [draftDarkDays, setDraftDarkDays] = useState<number[]>(darkDays);
 
   // Local staging for What-If exploratory soft locks (batching instead of immediate execution)
@@ -66,9 +69,14 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
     if (!isEditing) {
       setDraftActorBlackouts(actorBlackouts);
       setDraftLocationBlackouts(locationBlackouts);
+    }
+  }, [actorBlackouts, locationBlackouts, isEditing]);
+
+  useEffect(() => {
+    if (!isEditingDarkDays) {
       setDraftDarkDays(darkDays);
     }
-  }, [actorBlackouts, locationBlackouts, darkDays, isEditing]);
+  }, [darkDays, isEditingDarkDays]);
 
   useEffect(() => {
     setStagedSoftLocks(softLocks || {});
@@ -86,7 +94,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   const totalStagedLocks = Object.values(stagedSoftLocks).reduce((acc, arr) => acc + arr.length, 0);
   const totalActiveLocks = Object.values(softLocks || {}).reduce((acc, arr) => acc + arr.length, 0);
 
-  // Handlers for Draft Mode (Hard Constraints)
+  // Handlers for Matrix Blackouts Editing (Edit Hard Constraints)
   const handleToggleActorDraftBlackout = (actorId: string, day: number) => {
     if (!isEditing) return;
     const current = draftActorBlackouts[actorId] || [];
@@ -105,20 +113,12 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
     setDraftLocationBlackouts({ ...draftLocationBlackouts, [location]: updated });
   };
 
-  const handleToggleDraftDarkDay = (day: number) => {
-    if (!isEditing) return;
-    const updated = draftDarkDays.includes(day)
-      ? draftDarkDays.filter((d) => d !== day)
-      : [...draftDarkDays, day].sort((a, b) => a - b);
-    setDraftDarkDays(updated);
-  };
-
   const handleSaveDraft = async () => {
     if (!onSaveConstraints) return;
     await onSaveConstraints({
       actor_blackouts: draftActorBlackouts,
       location_blackouts: draftLocationBlackouts,
-      dark_days: draftDarkDays,
+      dark_days: darkDays,
     });
     setIsEditing(false);
   };
@@ -126,8 +126,31 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   const handleCancelDraft = () => {
     setDraftActorBlackouts(actorBlackouts);
     setDraftLocationBlackouts(locationBlackouts);
-    setDraftDarkDays(darkDays);
     setIsEditing(false);
+  };
+
+  // Handlers for Pre-Planned Dark Days Calendar (Configure Dark Days)
+  const handleToggleDraftDarkDay = (day: number) => {
+    if (!isEditingDarkDays) return;
+    const updated = draftDarkDays.includes(day)
+      ? draftDarkDays.filter((d) => d !== day)
+      : [...draftDarkDays, day].sort((a, b) => a - b);
+    setDraftDarkDays(updated);
+  };
+
+  const handleSaveDarkDays = async () => {
+    if (!onSaveConstraints) return;
+    await onSaveConstraints({
+      actor_blackouts: actorBlackouts,
+      location_blackouts: locationBlackouts,
+      dark_days: draftDarkDays,
+    });
+    setIsEditingDarkDays(false);
+  };
+
+  const handleCancelDarkDays = () => {
+    setDraftDarkDays(darkDays);
+    setIsEditingDarkDays(false);
   };
 
   // Handlers for What-If Exploratory Soft Locks (Staged locally, no instant re-solve)
@@ -168,7 +191,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   };
 
   const isDayDark = (day: number) => {
-    return isEditing ? draftDarkDays.includes(day) : darkDays.includes(day);
+    return isEditingDarkDays ? draftDarkDays.includes(day) : darkDays.includes(day);
   };
 
   return (
@@ -205,12 +228,12 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
           {isEditing ? (
             <div className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 animate-pulse">
               <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-              <span>Draft Edit Mode (Unsaved Changes)</span>
+              <span>Editing Matrix Blackouts (🚫 Contractual & Permit)</span>
             </div>
           ) : (
             <div className="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5">
               <Eye className="w-3.5 h-3.5 text-sky-400" />
-              <span>Read-Only Mode (Protected)</span>
+              <span>Read-Only Matrix (Protected)</span>
             </div>
           )}
         </div>
@@ -233,7 +256,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                 className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition-all cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>{isSolving ? 'Saving...' : 'Save & Re-Optimize'}</span>
+                <span>{isSolving ? 'Saving...' : 'Save Blackouts & Re-Optimize'}</span>
               </button>
             </>
           ) : (
@@ -289,10 +312,10 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                   onClick={() => setIsEditing(true)}
                   disabled={isSolving}
                   className="px-4 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                  title="Unlock edit mode to modify legal contract blackouts or pre-planned dark days"
+                  title="Unlock edit mode to modify contractual actor blackouts or location permit restrictions"
                 >
                   <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Edit Hard Constraints</span>
+                  <span>Edit Hard Constraints (Blackouts)</span>
                 </button>
               )}
             </>
@@ -300,17 +323,17 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
         </div>
       </div>
 
-      {/* Tier 2: DEDICATED PRE-PLANNED DARK DAYS & STATUTORY HIATUS CALENDAR */}
+      {/* DEDICATED PRE-PLANNED DARK DAYS & STATUTORY HIATUS CALENDAR (SOLE LOCATION FOR DARK DAYS) */}
       <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 shadow-inner">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div>
             <div className="flex items-center gap-2">
               <Moon className="w-4 h-4 text-indigo-400" />
               <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                🗓️ Pre-Planned Dark Days & Hiatus Calendar (Tier 1 Constraint)
+                🗓️ Pre-Planned Dark Days & Hiatus Calendar
               </h4>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950 border border-indigo-700 text-indigo-300">
-                Company-Wide
+                Company-Wide Hiatus
               </span>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
@@ -319,22 +342,46 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
           </div>
 
           <div className="shrink-0 flex items-center gap-2">
-            {!isEditing ? (
+            {!isEditingDarkDays ? (
               <button
-                onClick={() => setIsEditing(true)}
-                className="px-3 py-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/80 text-indigo-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                title="Edit company dark days and actor contract blackouts"
+                onClick={() => setIsEditingDarkDays(true)}
+                disabled={isSolving}
+                className="px-3.5 py-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/80 text-indigo-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Configure company dark days and statutory hiatus"
               >
                 <Edit3 className="w-3.5 h-3.5 text-indigo-300" />
                 <span>Configure Dark Days</span>
               </button>
             ) : (
-              <span className="px-2.5 py-1 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-semibold">
-                Click any day pill below to toggle Dark Day
-              </span>
+              <>
+                <button
+                  onClick={handleCancelDarkDays}
+                  disabled={isSolving}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Cancel</span>
+                </button>
+                <button
+                  onClick={handleSaveDarkDays}
+                  disabled={isSolving}
+                  className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isSolving ? 'Saving...' : 'Save Dark Days'}</span>
+                </button>
+              </>
             )}
           </div>
         </div>
+
+        {/* Guidance when configuring dark days */}
+        {isEditingDarkDays && (
+          <div className="p-2.5 rounded-lg bg-indigo-950/40 border border-indigo-800/60 text-[11px] text-indigo-200 flex items-center gap-2 animate-fadeIn">
+            <Info className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span>Click any day pill below to toggle between Shoot Day and Hiatus / Dark Day, then click <strong>"Save Dark Days"</strong>.</span>
+          </div>
+        )}
 
         {/* Day Pills Strip */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5">
@@ -345,10 +392,11 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                 key={d}
                 type="button"
                 onClick={() => {
-                  if (isEditing) {
+                  if (isEditingDarkDays) {
                     handleToggleDraftDarkDay(d);
                   } else {
-                    setIsEditing(true);
+                    setIsEditingDarkDays(true);
+                    handleToggleDraftDarkDay(d);
                   }
                 }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all shrink-0 ${
@@ -357,10 +405,10 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                     : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
                 } cursor-pointer hover:scale-105`}
                 title={
-                  isEditing
+                  isEditingDarkDays
                     ? isDark
-                      ? `Day ${d}: Dark Day (Click to reopen)`
-                      : `Day ${d}: Shoot Day (Click to set as Dark Day)`
+                      ? `Day ${d}: Dark Day (Click to reopen as Shoot Day)`
+                      : `Day ${d}: Shoot Day (Click to mark Dark Day)`
                     : isDark
                     ? `Day ${d}: Pre-Planned Dark Day (Hiatus). Click to edit.`
                     : `Day ${d}: Scheduled Shoot Day. Click to edit.`
@@ -401,7 +449,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
         <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200/90 flex items-start gap-2.5">
           <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="leading-relaxed">
-            <span className="font-bold text-amber-300">Tier 1 Hard Constraints Editing:</span> Click any cell to toggle contractual / permit blackouts (🚫). Click the <strong className="text-white font-mono">[🌙 Dark Day]</strong> button in any column header or the calendar strip above to declare that entire calendar date a festival/holiday dark day. Click <strong className="text-white">"Save & Re-Optimize"</strong> to batch-commit your changes to the Google CP-SAT solver.
+            <span className="font-bold text-amber-300">Editing Contract & Permit Blackouts:</span> Click any matrix cell to toggle actor contract blackouts or location permit restrictions (🚫). Pre-planned company dark days are managed separately in the Calendar above. Click <strong className="text-white">"Save Blackouts & Re-Optimize"</strong> to batch-commit your changes to the Google CP-SAT solver.
           </div>
         </div>
       ) : (
@@ -444,21 +492,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                         <span className={`font-mono text-xs ${dayDark ? 'text-indigo-400 font-bold' : 'text-slate-300'}`}>
                           Day {d}
                         </span>
-                        {isEditing && (
-                          <button
-                            onClick={() => handleToggleDraftDarkDay(d)}
-                            title={dayDark ? `Reopen Day ${d}` : `Mark Day ${d} as Festival / Dark Day`}
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
-                              dayDark
-                                ? 'bg-indigo-600 text-white border-indigo-500'
-                                : 'bg-slate-800 hover:bg-indigo-950 text-slate-400 hover:text-indigo-300 border-slate-700'
-                            }`}
-                          >
-                            <Moon className="w-2.5 h-2.5 inline mr-0.5" />
-                            {dayDark ? 'Dark' : 'Hiatus'}
-                          </button>
-                        )}
-                        {!isEditing && dayDark && (
+                        {dayDark && (
                           <span className="px-1.5 py-0.2 rounded bg-indigo-950 border border-indigo-800 text-indigo-300 text-[9px] font-bold">
                             Hiatus
                           </span>
@@ -590,21 +624,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                         <span className={`font-mono text-xs ${dayDark ? 'text-indigo-400 font-bold' : 'text-slate-300'}`}>
                           Day {d}
                         </span>
-                        {isEditing && (
-                          <button
-                            onClick={() => handleToggleDraftDarkDay(d)}
-                            title={dayDark ? `Reopen Day ${d}` : `Mark Day ${d} as Festival / Dark Day`}
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
-                              dayDark
-                                ? 'bg-indigo-600 text-white border-indigo-500'
-                                : 'bg-slate-800 hover:bg-indigo-950 text-slate-400 hover:text-indigo-300 border-slate-700'
-                            }`}
-                          >
-                            <Moon className="w-2.5 h-2.5 inline mr-0.5" />
-                            {dayDark ? 'Dark' : 'Hiatus'}
-                          </button>
-                        )}
-                        {!isEditing && dayDark && (
+                        {dayDark && (
                           <span className="px-1.5 py-0.2 rounded bg-indigo-950 border border-indigo-800 text-indigo-300 text-[9px] font-bold">
                             Hiatus
                           </span>
