@@ -11,6 +11,8 @@ import {
   Moon,
   Sparkles,
   Info,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface AvailabilityMatrixProps {
@@ -84,6 +86,18 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
 
   const daysHeader = Array.from({ length: numDays }, (_, i) => i + 1);
 
+  // Week Filtering & Pagination for large productions (20 - 100 days)
+  const [selectedWeek, setSelectedWeek] = useState<number | 'all'>('all');
+  const totalWeeks = Math.ceil(numDays / 5);
+  const visibleDays = selectedWeek === 'all'
+    ? daysHeader
+    : daysHeader.filter((d) => Math.ceil(d / 5) === selectedWeek);
+
+  // Dropdown & Range helpers for Dark Days Calendar
+  const [selectedDarkDayToAdd, setSelectedDarkDayToAdd] = useState<number>(1);
+  const [rangeStart, setRangeStart] = useState<number>(1);
+  const [rangeEnd, setRangeEnd] = useState<number>(Math.min(numDays, 3));
+
   // Extract unique locations from all days
   const allLocations = Array.from(
     new Set(days.flatMap((d) => d.scenes.map((s) => s.location)))
@@ -151,6 +165,24 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   const handleCancelDarkDays = () => {
     setDraftDarkDays(darkDays);
     setIsEditingDarkDays(false);
+  };
+
+  const handleAddSingleDarkDay = () => {
+    if (!isEditingDarkDays) return;
+    if (selectedDarkDayToAdd && !draftDarkDays.includes(selectedDarkDayToAdd)) {
+      setDraftDarkDays([...draftDarkDays, selectedDarkDayToAdd].sort((a, b) => a - b));
+    }
+  };
+
+  const handleApplyDarkRange = () => {
+    if (!isEditingDarkDays) return;
+    const start = Math.max(1, Math.min(rangeStart, rangeEnd));
+    const end = Math.min(numDays, Math.max(rangeStart, rangeEnd));
+    const newDays = new Set(draftDarkDays);
+    for (let d = start; d <= end; d++) {
+      newDays.add(d);
+    }
+    setDraftDarkDays(Array.from(newDays).sort((a, b) => a - b));
   };
 
   // Handlers for What-If Exploratory Soft Locks (Staged locally, no instant re-solve)
@@ -375,58 +407,157 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
           </div>
         </div>
 
-        {/* Guidance when configuring dark days */}
+        {/* Active Dark Days Exception List */}
+        <div className="space-y-2">
+          <div className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+            <Moon className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Scheduled Dark Days ({isEditingDarkDays ? draftDarkDays.length : darkDays.length}):</span>
+          </div>
+
+          {(isEditingDarkDays ? draftDarkDays : darkDays).length === 0 ? (
+            <div className="text-xs text-slate-400 py-1 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>No hiatus or dark days scheduled. All {numDays} shoot days are active calls.</span>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              {(isEditingDarkDays ? draftDarkDays : darkDays).map((d) => (
+                <div
+                  key={d}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-950 border border-indigo-600 text-indigo-200 text-xs font-bold shadow-sm"
+                >
+                  <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Day {d}: Hiatus / Dark Day</span>
+                  {isEditingDarkDays && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleDraftDarkDay(d)}
+                      className="p-0.5 rounded hover:bg-indigo-900 text-indigo-400 hover:text-rose-400 transition-colors cursor-pointer"
+                      title={`Remove Day ${d} from dark days`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Dropdown & Range Tools when configuring dark days */}
         {isEditingDarkDays && (
-          <div className="p-2.5 rounded-lg bg-indigo-950/40 border border-indigo-800/60 text-[11px] text-indigo-200 flex items-center gap-2 animate-fadeIn">
-            <Info className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span>Click any day pill below to toggle between Shoot Day and Hiatus / Dark Day, then click <strong>"Save Dark Days"</strong>.</span>
+          <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+              {/* Dropdown to add single day */}
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-300">Add Dark Day:</span>
+                <select
+                  value={selectedDarkDayToAdd}
+                  onChange={(e) => setSelectedDarkDayToAdd(Number(e.target.value))}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  {daysHeader
+                    .filter((d) => !draftDarkDays.includes(d))
+                    .map((d) => (
+                      <option key={d} value={d}>
+                        Day {d} of {numDays} (Shoot Call)
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleAddSingleDarkDay}
+                  disabled={draftDarkDays.includes(selectedDarkDayToAdd)}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
+                >
+                  + Add Dark Day
+                </button>
+              </div>
+
+              {/* Multi-Day Range Selector for longer productions (e.g. 20-100 days) */}
+              <div className="flex items-center gap-2 pl-3 border-l border-slate-800">
+                <span className="font-semibold text-slate-400">Multi-Day Range:</span>
+                <span className="text-[11px] text-slate-500">Day</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={numDays}
+                  value={rangeStart}
+                  onChange={(e) => setRangeStart(Number(e.target.value))}
+                  className="w-12 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white text-center"
+                />
+                <span className="text-[11px] text-slate-500">to</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={numDays}
+                  value={rangeEnd}
+                  onChange={(e) => setRangeEnd(Number(e.target.value))}
+                  className="w-12 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white text-center"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyDarkRange}
+                  className="px-2.5 py-1 rounded bg-slate-800 hover:bg-indigo-950 border border-slate-700 text-slate-200 hover:text-indigo-200 text-xs font-semibold cursor-pointer"
+                >
+                  Mark Range Dark
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Day Pills Strip */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5">
-          {daysHeader.map((d) => {
-            const isDark = isDayDark(d);
-            return (
-              <button
-                key={d}
-                type="button"
-                onClick={() => {
-                  if (isEditingDarkDays) {
-                    handleToggleDraftDarkDay(d);
-                  } else {
-                    setIsEditingDarkDays(true);
-                    handleToggleDraftDarkDay(d);
-                  }
-                }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all shrink-0 ${
-                  isDark
-                    ? 'bg-indigo-950 border-indigo-600 text-indigo-200 shadow-md shadow-indigo-950/60 ring-1 ring-indigo-500/30'
-                    : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
-                } cursor-pointer hover:scale-105`}
-                title={
-                  isEditingDarkDays
-                    ? isDark
-                      ? `Day ${d}: Dark Day (Click to reopen as Shoot Day)`
-                      : `Day ${d}: Shoot Day (Click to mark Dark Day)`
-                    : isDark
-                    ? `Day ${d}: Pre-Planned Dark Day (Hiatus). Click to edit.`
-                    : `Day ${d}: Scheduled Shoot Day. Click to edit.`
-                }
-              >
-                <span className={`w-2 h-2 rounded-full ${isDark ? 'bg-indigo-400 animate-pulse' : 'bg-emerald-400'}`} />
-                <span className="font-mono font-bold">Day {d}</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                    isDark ? 'bg-indigo-900/90 text-indigo-200' : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  {isDark ? '🌙 Dark / Hiatus' : '🎬 Shoot Day'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Compact Quick Pills Strip (shown for shoots <= 12 days, or as optional quick glance) */}
+        {numDays <= 12 && (
+          <div className="pt-1">
+            <div className="text-[10px] text-slate-500 font-medium mb-1">
+              Quick Day Toggle ({numDays} Days):
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {daysHeader.map((d) => {
+                const isDark = isDayDark(d);
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => {
+                      if (isEditingDarkDays) {
+                        handleToggleDraftDarkDay(d);
+                      } else {
+                        setIsEditingDarkDays(true);
+                        handleToggleDraftDarkDay(d);
+                      }
+                    }}
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all shrink-0 ${
+                      isDark
+                        ? 'bg-indigo-950 border-indigo-600 text-indigo-200 shadow-md shadow-indigo-950/60 ring-1 ring-indigo-500/30'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
+                    } cursor-pointer hover:scale-105`}
+                    title={
+                      isEditingDarkDays
+                        ? isDark
+                          ? `Day ${d}: Dark Day (Click to reopen as Shoot Day)`
+                          : `Day ${d}: Shoot Day (Click to mark Dark Day)`
+                        : isDark
+                        ? `Day ${d}: Pre-Planned Dark Day (Hiatus). Click to edit.`
+                        : `Day ${d}: Scheduled Shoot Day. Click to edit.`
+                    }
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isDark ? 'bg-indigo-400 animate-pulse' : 'bg-emerald-400'}`} />
+                    <span className="font-mono font-bold">Day {d}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                        isDark ? 'bg-indigo-900/90 text-indigo-200' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {isDark ? '🌙 Dark' : '🎬 Shoot'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Cross-Link notice to Sudden Chaos Off Days */}
         <div className="text-[11px] text-slate-400 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-2 border-t border-slate-800/60">
@@ -477,14 +608,142 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
         </div>
       )}
 
+      {/* Week Pagination & Filter Bar for Long Productions (e.g. 20 - 100 days) */}
+      {numDays > 5 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-xs shadow-inner">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-slate-300 flex items-center gap-1.5">
+              <span>📅 View Week:</span>
+            </span>
+
+            {totalWeeks <= 6 ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedWeek('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    selectedWeek === 'all'
+                      ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                      : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  All Days (1–{numDays})
+                </button>
+                {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((w) => {
+                  const startDay = (w - 1) * 5 + 1;
+                  const endDay = Math.min(w * 5, numDays);
+                  return (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setSelectedWeek(w)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        selectedWeek === w
+                          ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                          : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      Week {w} (D{startDay}–D{endDay})
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedWeek('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    selectedWeek === 'all'
+                      ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                      : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  All Days (1–{numDays})
+                </button>
+
+                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedWeek === 'all' || selectedWeek <= 1) {
+                        setSelectedWeek(totalWeeks);
+                      } else {
+                        setSelectedWeek(selectedWeek - 1);
+                      }
+                    }}
+                    className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 cursor-pointer"
+                    title="Previous Week"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <select
+                    value={selectedWeek}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedWeek(val === 'all' ? 'all' : Number(val));
+                    }}
+                    className="bg-transparent text-slate-200 font-medium text-xs px-2 py-1 outline-none cursor-pointer"
+                  >
+                    <option value="all" className="bg-slate-900 text-white">
+                      All Weeks ({totalWeeks} Weeks / {numDays} Days)
+                    </option>
+                    {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((w) => {
+                      const startDay = (w - 1) * 5 + 1;
+                      const endDay = Math.min(w * 5, numDays);
+                      return (
+                        <option key={w} value={w} className="bg-slate-900 text-white">
+                          Week {w} (Days {startDay}–{endDay})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedWeek === 'all' || selectedWeek >= totalWeeks) {
+                        setSelectedWeek(1);
+                      } else {
+                        setSelectedWeek(selectedWeek + 1);
+                      }
+                    }}
+                    className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 cursor-pointer"
+                    title="Next Week"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400">
+              Showing <span className="text-white font-bold">{visibleDays.length}</span> of {numDays} days
+            </span>
+            {selectedWeek !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setSelectedWeek('all')}
+                className="text-xs text-purple-400 hover:text-purple-300 font-semibold underline cursor-pointer"
+              >
+                Reset to All
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* MATRIX VIEW: CAST DOOD */}
       {activeSubTab === 'cast' && (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 font-medium">
-                <th className="py-3 px-3 min-w-[180px]">Character / Actor</th>
-                {daysHeader.map((d) => {
+                <th className="py-3 px-3 min-w-[180px] sticky left-0 bg-slate-900/95 z-20 border-r border-slate-800 shadow-md">
+                  Character / Actor
+                </th>
+                {visibleDays.map((d) => {
                   const dayDark = isDayDark(d);
                   return (
                     <th key={d} className="py-2.5 px-2 text-center min-w-[72px]">
@@ -509,12 +768,13 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
             <tbody className="divide-y divide-slate-800/60">
               {doodMatrix.map((row) => (
                 <tr key={row.actor_id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-3 px-3">
+                  <td className="py-3 px-3 sticky left-0 bg-slate-900/95 z-10 border-r border-slate-800 shadow-md">
                     <div className="font-semibold text-white">{row.character_name}</div>
                     <div className="text-[11px] text-slate-400">{row.name}</div>
                   </td>
 
-                  {daysHeader.map((d, idx) => {
+                  {visibleDays.map((d) => {
+                    const idx = d - 1;
                     const code = row.day_codes[idx] || '-';
                     const isDark = isDayDark(d);
                     const isBlackout = isActorBlackout(row.actor_id, d);
@@ -615,8 +875,10 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 font-medium">
-                <th className="py-3 px-3 min-w-[200px]">Filming Location</th>
-                {daysHeader.map((d) => {
+                <th className="py-3 px-3 min-w-[200px] sticky left-0 bg-slate-900/95 z-20 border-r border-slate-800 shadow-md">
+                  Filming Location
+                </th>
+                {visibleDays.map((d) => {
                   const dayDark = isDayDark(d);
                   return (
                     <th key={d} className="py-2.5 px-2 text-center min-w-[80px]">
@@ -643,12 +905,12 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
 
                 return (
                   <tr key={loc} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-3 font-semibold text-white flex items-center gap-2">
+                    <td className="py-3 px-3 font-semibold text-white flex items-center gap-2 sticky left-0 bg-slate-900/95 z-10 border-r border-slate-800 shadow-md">
                       <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                       <span>{loc}</span>
                     </td>
 
-                    {daysHeader.map((d) => {
+                    {visibleDays.map((d) => {
                       const daySchedule = days.find((day) => day.day_number === d);
                       const isShootingHere = daySchedule?.locations.includes(loc);
                       const scenesCount = daySchedule?.scenes.filter((s) => s.location === loc).length || 0;

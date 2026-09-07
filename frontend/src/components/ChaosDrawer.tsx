@@ -252,21 +252,36 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             <label className="block text-[11px] font-bold text-slate-300 mb-1.5">
               Select Day to Evacuate & Lock Down:
             </label>
-            <div className="flex flex-wrap items-center gap-1.5 max-h-28 overflow-y-auto p-1 bg-slate-950/70 rounded-lg border border-slate-800">
-              {daysList.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setShutdownDay(d)}
-                  className={`px-2.5 py-1 rounded border text-xs font-bold transition-all cursor-pointer ${
-                    shutdownDay === d
-                      ? 'bg-rose-600 text-white border-rose-400 shadow-md shadow-rose-600/40 scale-105'
-                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white hover:border-slate-600'
-                  }`}
-                >
-                  Day {d}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <select
+                value={shutdownDay}
+                onChange={(e) => setShutdownDay(Number(e.target.value))}
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-rose-500 cursor-pointer"
+              >
+                {daysList.map((d) => (
+                  <option key={d} value={d}>
+                    Day {d} of {daysList.length} (Shoot Call)
+                  </option>
+                ))}
+              </select>
+              {daysList.length <= 8 && (
+                <div className="flex items-center gap-1">
+                  {daysList.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setShutdownDay(d)}
+                      className={`w-7 h-7 rounded border text-[11px] font-bold transition-all cursor-pointer ${
+                        shutdownDay === d
+                          ? 'bg-rose-600 text-white border-rose-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -363,25 +378,87 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             )}
 
             <div>
-              <label className="block text-[11px] text-slate-400 font-medium mb-1.5">
-                Affected Shoot Day(s) ({daysList.length} Total Days)
-              </label>
-              <div className="flex flex-wrap items-center gap-1.5 max-h-32 overflow-y-auto p-1 bg-slate-950/50 rounded-lg border border-slate-800">
-                {daysList.map((d) => (
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[11px] text-slate-400 font-medium">
+                  Affected Shoot Day(s) ({daysList.length} Total Days)
+                </label>
+                {selectedDays.length > 0 && (
                   <button
-                    key={d}
                     type="button"
-                    onClick={() => handleToggleDay(d)}
-                    className={`w-8 h-7 rounded border text-[11px] font-bold transition-all ${
-                      selectedDays.includes(d)
-                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
-                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                    }`}
+                    onClick={() => setSelectedDays([])}
+                    className="text-[10px] text-rose-400 hover:underline cursor-pointer"
                   >
-                    {d}
+                    Clear selection
                   </button>
-                ))}
+                )}
               </div>
+
+              {daysList.length > 10 ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <select
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (val && !selectedDays.includes(val)) {
+                          setSelectedDays([...selectedDays, val].sort((a, b) => a - b));
+                        }
+                      }}
+                      value=""
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                    >
+                      <option value="" disabled>
+                        + Select Day to add (Day 1 - {daysList.length})
+                      </option>
+                      {daysList
+                        .filter((d) => !selectedDays.includes(d))
+                        .map((d) => (
+                          <option key={d} value={d}>
+                            Day {d}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {selectedDays.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-950/60 rounded-lg border border-slate-800">
+                      {selectedDays.map((d) => (
+                        <span
+                          key={d}
+                          className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1"
+                        >
+                          <span>Day {d}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDays(selectedDays.filter((x) => x !== d))}
+                            className="hover:text-white cursor-pointer ml-0.5"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 italic">Select one or more days from the dropdown.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-1.5 max-h-32 overflow-y-auto p-1 bg-slate-950/50 rounded-lg border border-slate-800">
+                  {daysList.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => handleToggleDay(d)}
+                      className={`w-8 h-7 rounded border text-[11px] font-bold transition-all cursor-pointer ${
+                        selectedDays.includes(d)
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>

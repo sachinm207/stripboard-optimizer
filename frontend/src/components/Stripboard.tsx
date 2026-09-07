@@ -1,5 +1,5 @@
-import React from 'react';
-import { Moon, Sun, MapPin, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Moon, Sun, MapPin, AlertCircle, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DaySchedule } from '../types';
 import { StripItem } from './StripItem';
 
@@ -10,12 +10,35 @@ interface StripboardProps {
 }
 
 export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLockScene }) => {
+  const [selectedWeek, setSelectedWeek] = useState<number | 'all'>('all');
+  const totalWeeks = Math.ceil(days.length / 5);
+
+  const visibleDays = selectedWeek === 'all'
+    ? days
+    : days.filter((d) => Math.ceil(d.day_number / 5) === selectedWeek);
+
+  const handlePrevWeek = () => {
+    if (selectedWeek === 'all' || selectedWeek <= 1) {
+      setSelectedWeek(totalWeeks);
+    } else {
+      setSelectedWeek(selectedWeek - 1);
+    }
+  };
+
+  const handleNextWeek = () => {
+    if (selectedWeek === 'all' || selectedWeek >= totalWeeks) {
+      setSelectedWeek(1);
+    } else {
+      setSelectedWeek(selectedWeek + 1);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
           <span>SHOOTING STRIPBOARD CANVAS</span>
-          <span className="text-xs font-normal text-slate-400">({days.length} Shoot Days)</span>
+          <span className="text-xs font-normal text-slate-400">({days.length} Shoot Days total)</span>
         </h2>
 
         {/* Legend */}
@@ -39,8 +62,123 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLoc
         </div>
       </div>
 
+      {/* Week Navigation & Day Filter for Multi-Week Productions (e.g., 20 - 100 days) */}
+      {days.length > 7 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-xs shadow-inner">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-slate-300 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-purple-400" />
+              <span>Production Schedule:</span>
+            </span>
+
+            {totalWeeks <= 6 ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedWeek('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    selectedWeek === 'all'
+                      ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                      : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  All Days ({days.length})
+                </button>
+                {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((w) => {
+                  const startDay = (w - 1) * 5 + 1;
+                  const endDay = Math.min(w * 5, days.length);
+                  return (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setSelectedWeek(w)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        selectedWeek === w
+                          ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                          : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      Week {w} (D{startDay}–D{endDay})
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedWeek('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    selectedWeek === 'all'
+                      ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                      : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  }`}
+                >
+                  All Days
+                </button>
+
+                <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+                  <button
+                    type="button"
+                    onClick={handlePrevWeek}
+                    className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-850 cursor-pointer"
+                    title="Previous Week"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <select
+                    value={selectedWeek}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedWeek(val === 'all' ? 'all' : Number(val));
+                    }}
+                    className="bg-transparent text-slate-200 font-medium text-xs px-2 py-1 outline-none cursor-pointer"
+                  >
+                    <option value="all" className="bg-slate-900 text-white">
+                      All Weeks ({totalWeeks} Weeks / {days.length} Days)
+                    </option>
+                    {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((w) => {
+                      const startDay = (w - 1) * 5 + 1;
+                      const endDay = Math.min(w * 5, days.length);
+                      return (
+                        <option key={w} value={w} className="bg-slate-900 text-white">
+                          Week {w} (Days {startDay}–{endDay})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleNextWeek}
+                    className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-850 cursor-pointer"
+                    title="Next Week"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400">
+              Showing <span className="text-white font-bold">{visibleDays.length}</span> of {days.length} days
+            </span>
+            {selectedWeek !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setSelectedWeek('all')}
+                className="text-xs text-purple-400 hover:text-purple-300 font-semibold underline cursor-pointer"
+              >
+                Reset to All
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3">
-        {days.map((day) => {
+        {visibleDays.map((day) => {
           const hours = Math.floor(day.total_duration_minutes / 60);
           const mins = day.total_duration_minutes % 60;
           const isOverCapacity = day.total_duration_minutes > 600;
