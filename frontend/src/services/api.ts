@@ -1,4 +1,14 @@
-import { Scene, Actor, ScheduleSolution, DisruptionAlert, KafkaStatus, UnionAudit, ProductionConstraints } from '../types';
+import {
+  Scene,
+  Actor,
+  ScheduleSolution,
+  DisruptionAlert,
+  KafkaStatus,
+  UnionAudit,
+  ProductionConstraints,
+  ScheduleVersion,
+  VersionDiffResult,
+} from '../types';
 
 const API_BASE = '/api';
 
@@ -216,5 +226,51 @@ export async function clearSoftLocks(): Promise<ScheduleSolution> {
   if (!res.ok) throw new Error('Failed to clear soft locks');
   return res.json();
 }
+
+export async function fetchVersions(): Promise<ScheduleVersion[]> {
+  const res = await fetch(`${API_BASE}/versions`);
+  if (!res.ok) throw new Error('Failed to fetch versions');
+  return res.json();
+}
+
+export async function saveVersion(label?: string, notes?: string): Promise<ScheduleVersion> {
+  const res = await fetch(`${API_BASE}/versions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label, notes }),
+  });
+  if (!res.ok) throw new Error('Failed to save version');
+  return res.json();
+}
+
+export async function restoreVersion(versionId: string): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/versions/${versionId}/restore`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error('Failed to restore version');
+  return res.json();
+}
+
+export async function deleteVersion(versionId: string): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/versions/${versionId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Failed to delete version');
+  return res.json();
+}
+
+export async function diffVersions(baseVersionId: string, targetVersionId: string): Promise<VersionDiffResult> {
+  const res = await fetch(`${API_BASE}/versions/diff`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      base_version_id: baseVersionId,
+      target_version_id: targetVersionId,
+    }),
+  });
+  if (!res.ok) throw new Error('Failed to compute version diff');
+  return res.json();
+}
+
 
 

@@ -8,12 +8,20 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import datetime
 from backend.app.models.scene import Scene, SceneSetting
 from backend.app.models.actor import Actor
 from backend.app.models.disruption import DisruptionAlert
 from backend.app.models.schedule import ScheduleSolution, DaySchedule, ScheduleMetrics
+from backend.app.models.version import (
+    ScheduleVersion,
+    VersionDiffResult,
+    CreateVersionRequest,
+    DiffVersionsRequest
+)
 from backend.app.solver.cp_sat_model import StripboardSolver, generate_naive_schedule
 from backend.app.solver.dood_calculator import calculate_dood_matrix
+from backend.app.solver.version_diff import compute_version_diff
 from backend.app.kafka.bus import event_bus, ALL_TOPICS
 from backend.app.agents.memo_agent import ExecutiveMemoAgent
 from backend.app.agents.union_agent import UnionComplianceAgent
@@ -39,7 +47,43 @@ STATE = {
     "location_blackouts": {},
     "dark_days": [],
     "soft_locks": {},
+    "versions": [],
 }
+
+def create_version_snapshot(label: Optional[str] = None, notes: Optional[str] = None) -> ScheduleVersion:
+    if not STATE.get("current_solution"):
+        raise HTTPException(status_code=400, detail="No schedule solution available to snapshot")
+
+    version_num = len(STATE.get("versions", [])) + 1
+    version_id = f"v{version_num}_{int(datetime.datetime.now(datetime.timezone.utc).timestamp())}"
+    actual_label = label or f"Version {version_num} ({datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')})"
+
+    sol_copy = STATE["current_solution"].model_copy(deep=True)
+    scenes_copy = [s.model_copy(deep=True) for s in STATE.get("scenes", [])]
+    actors_copy = [a.model_copy(deep=True) for a in STATE.get("actors", [])]
+    disruptions_copy = [d.model_copy(deep=True) for d in STATE.get("active_disruptions", [])]
+
+    version = ScheduleVersion(
+        version_id=version_id,
+        version_number=version_num,
+        label=actual_label,
+        notes=notes,
+        created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        production_id=STATE.get("production_id") or "prod_neon_horizon",
+        total_days=len(sol_copy.days),
+        total_cost=sol_copy.metrics.objective_cost,
+        company_moves=sol_copy.metrics.total_company_moves,
+        hold_days=sol_copy.metrics.total_hold_days,
+        solution=sol_copy,
+        scenes=scenes_copy,
+        actors=actors_copy,
+        actor_blackouts={k: list(v) for k, v in STATE.get("actor_blackouts", {}).items()},
+        location_blackouts={k: list(v) for k, v in STATE.get("location_blackouts", {}).items()},
+        dark_days=list(STATE.get("dark_days", [])),
+        soft_locks={k: list(v) for k, v in STATE.get("soft_locks", {}).items()},
+        active_disruptions=disruptions_copy
+    )
+    return version
 
 def run_solver(disruptions=None, naive_cost=None) -> ScheduleSolution:
     if disruptions is None:
@@ -112,6 +156,12 @@ def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = 
         solution.production_id = STATE["production_id"]
         solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
         STATE["current_solution"] = solution
+
+    if STATE.get("current_solution"):
+        try:
+            STATE["versions"] = [create_version_snapshot("Baseline Schedule (v1)", "Initial production schedule baseline")]
+        except Exception:
+            pass
 
 class ConnectionManager:
     def __init__(self):
@@ -694,6 +744,91 @@ def get_union_audit():
     if not STATE["current_solution"]:
         raise HTTPException(status_code=404, detail="No schedule available to audit")
     return union_agent.audit_schedule(STATE["current_solution"])
+
+@app.get("/api/versions", response_model=List[ScheduleVersion])
+def get_versions():
+    if not STATE.get("versions") and STATE.get("current_solution"):
+        try:
+            STATE["versions"] = [create_version_snapshot("Baseline Schedule (v1)", "Initial production baseline")]
+        except Exception:
+            pass
+    return STATE.get("versions", [])
+
+@app.post("/api/versions", response_model=ScheduleVersion)
+async def save_version(req: Optional[CreateVersionRequest] = None):
+    label = req.label if req and req.label else None
+    notes = req.notes if req and req.notes else None
+    version = create_version_snapshot(label=label, notes=notes)
+    STATE.setdefault("versions", []).append(version)
+    await event_bus.publish("schedule.version.saved", {
+        "version_id": version.version_id,
+        "label": version.label,
+        "version_number": version.version_number
+    })
+    return version
+
+@app.get("/api/versions/{version_id}", response_model=ScheduleVersion)
+def get_version(version_id: str):
+    for v in STATE.get("versions", []):
+        if v.version_id == version_id:
+            return v
+    raise HTTPException(status_code=404, detail=f"Version '{version_id}' not found")
+
+@app.post("/api/versions/{version_id}/restore", response_model=ScheduleSolution)
+async def restore_version(version_id: str):
+    target_v = None
+    for v in STATE.get("versions", []):
+        if v.version_id == version_id:
+            target_v = v
+            break
+    if not target_v:
+        raise HTTPException(status_code=404, detail=f"Version '{version_id}' not found")
+
+    STATE["scenes"] = [s.model_copy(deep=True) for s in target_v.scenes]
+    STATE["actors"] = [a.model_copy(deep=True) for a in target_v.actors]
+    STATE["actor_blackouts"] = {k: list(val) for k, val in target_v.actor_blackouts.items()}
+    STATE["location_blackouts"] = {k: list(val) for k, val in target_v.location_blackouts.items()}
+    STATE["dark_days"] = list(target_v.dark_days)
+    STATE["soft_locks"] = {k: list(val) for k, val in target_v.soft_locks.items()}
+    STATE["active_disruptions"] = [d.model_copy(deep=True) for d in target_v.active_disruptions]
+    STATE["current_solution"] = target_v.solution.model_copy(deep=True)
+
+    await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+    return STATE["current_solution"]
+
+@app.delete("/api/versions/{version_id}")
+def delete_version(version_id: str):
+    versions = STATE.get("versions", [])
+    filtered = [v for v in versions if v.version_id != version_id]
+    if len(filtered) == len(versions):
+        raise HTTPException(status_code=404, detail=f"Version '{version_id}' not found")
+    STATE["versions"] = filtered
+    return {"status": "deleted", "version_id": version_id}
+
+@app.post("/api/versions/diff", response_model=VersionDiffResult)
+def diff_versions(req: DiffVersionsRequest):
+    if req.base_version_id == "current_wip":
+        base_v = create_version_snapshot("Current Work In Progress (WIP)", "Live working changes")
+    else:
+        base_v = next((v for v in STATE.get("versions", []) if v.version_id == req.base_version_id), None)
+        if not base_v:
+            raise HTTPException(status_code=404, detail=f"Base version '{req.base_version_id}' not found")
+
+    if req.target_version_id == "current_wip":
+        target_v = create_version_snapshot("Current Work In Progress (WIP)", "Live working changes")
+    else:
+        target_v = next((v for v in STATE.get("versions", []) if v.version_id == req.target_version_id), None)
+        if not target_v:
+            raise HTTPException(status_code=404, detail=f"Target version '{req.target_version_id}' not found")
+
+    res = compute_version_diff(base_v, target_v)
+    if req.base_version_id == "current_wip":
+        res.base_version_id = "current_wip"
+        res.base_label = "Current Work In Progress (WIP)"
+    if req.target_version_id == "current_wip":
+        res.target_version_id = "current_wip"
+        res.target_label = "Current Work In Progress (WIP)"
+    return res
 
 @app.websocket("/ws/events")
 async def websocket_events_endpoint(websocket: WebSocket):

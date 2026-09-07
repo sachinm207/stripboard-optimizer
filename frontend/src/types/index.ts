@@ -110,3 +110,78 @@ export interface KafkaStatus {
   total_events_logged: number;
   active_websocket_subscribers: number;
 }
+
+export interface ScheduleVersion {
+  version_id: string;
+  version_number: number;
+  label: string;
+  notes?: string;
+  created_at: string;
+  production_id: string;
+  total_days: number;
+  total_cost: number;
+  company_moves: number;
+  hold_days: number;
+  solution: ScheduleSolution;
+  scenes: Scene[];
+  actors: Actor[];
+  actor_blackouts: Record<string, number[]>;
+  location_blackouts: Record<string, number[]>;
+  dark_days: number[];
+  soft_locks: Record<string, number[]>;
+  active_disruptions: DisruptionAlert[];
+}
+
+export interface VersionDiffActorChange {
+  actor_id: string;
+  actor_name: string;
+  character_name: string;
+  work_days_before: number[];
+  work_days_after: number[];
+  hold_days_before: number;
+  hold_days_after: number;
+  status_changes: Record<number, { before: string; after: string }>;
+  cost_before: number;
+  cost_after: number;
+}
+
+export interface VersionDiffLocationChange {
+  location: string;
+  days_before: number[];
+  days_after: number[];
+  scenes_count_before: number;
+  scenes_count_after: number;
+}
+
+export interface VersionDiffDayChange {
+  day_number: number;
+  is_dark_before: boolean;
+  is_dark_after: boolean;
+  dark_reason_before?: string;
+  dark_reason_after?: string;
+  scenes_before: string[];
+  scenes_after: string[];
+  scenes_added: string[];
+  scenes_removed: string[];
+  duration_before: number;
+  duration_after: number;
+  locations_before: string[];
+  locations_after: string[];
+}
+
+export interface VersionDiffResult {
+  base_version_id: string;
+  base_label: string;
+  target_version_id: string;
+  target_label: string;
+  cost_delta: number;
+  moves_delta: number;
+  hold_days_delta: number;
+  turnaround_delta: number;
+  actor_changes: VersionDiffActorChange[];
+  location_changes: VersionDiffLocationChange[];
+  day_changes: VersionDiffDayChange[];
+  dark_days_added: number[];
+  dark_days_removed: number[];
+  summary_text: string;
+}

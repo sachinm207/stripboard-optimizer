@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clapperboard, Cpu, Sparkles, Radio, Flame, FileText, RotateCcw, Upload, Sliders, Home } from 'lucide-react';
+import { Clapperboard, Cpu, Sparkles, Radio, Flame, FileText, RotateCcw, Upload, Sliders, Home, History } from 'lucide-react';
 import { KafkaStatus } from '../types';
 
 interface NavbarProps {
@@ -8,6 +8,7 @@ interface NavbarProps {
   hasProduction?: boolean;
   onOpenChaos: () => void;
   onOpenMemo: () => void;
+  onOpenVersions?: () => void;
   onOpenImport?: () => void;
   onOpenSettings?: () => void;
   onReset: () => void;
@@ -22,6 +23,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   hasProduction = true,
   onOpenChaos,
   onOpenMemo,
+  onOpenVersions,
   onOpenImport,
   onOpenSettings,
   onReset,
@@ -70,20 +72,33 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           {hasProduction && (
             <>
+              {/* HERO THROW CHAOS BUTTON: Bold, Pulsing, High Visibility Emergency Action */}
               <button
                 onClick={onOpenChaos}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 hover:text-rose-200 text-xs font-semibold transition-all shadow-sm"
+                className="flex items-center gap-2.5 px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 hover:from-rose-500 hover:via-red-500 hover:to-amber-500 text-white text-xs sm:text-sm font-black tracking-wider uppercase shadow-xl shadow-rose-950/80 ring-2 ring-rose-400/50 hover:ring-rose-300 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                title="Simulate sudden Force Majeure, COVID isolations, weather emergencies, and multi-day shutdowns"
               >
-                <Flame className="w-4 h-4 text-rose-400" />
-                <span>Throw Chaos</span>
+                <Flame className="w-4 h-4 sm:w-5 sm:h-5 text-amber-200 animate-pulse" />
+                <span>Throw Chaos ⚡</span>
               </button>
+
+              {onOpenVersions && (
+                <button
+                  onClick={onOpenVersions}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 hover:text-purple-200 text-xs font-semibold transition-all shadow-sm cursor-pointer"
+                  title="Open Version History & Diff Explorer"
+                >
+                  <History className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Versions & Diff</span>
+                </button>
+              )}
 
               <button
                 onClick={onOpenMemo}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 hover:text-sky-200 text-xs font-semibold transition-all shadow-sm"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 hover:text-sky-200 text-xs font-semibold transition-all shadow-sm"
               >
                 <FileText className="w-4 h-4 text-sky-400" />
                 <span>Executive Memo</span>

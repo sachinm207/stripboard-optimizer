@@ -7,6 +7,7 @@ import { ChaosDrawer } from './components/ChaosDrawer';
 import { ProducerMemoModal } from './components/ProducerMemoModal';
 import { ImportModal } from './components/ImportModal';
 import { SettingsModal } from './components/SettingsModal';
+import { VersionModal } from './components/VersionModal';
 import {
   fetchSchedule,
   fetchScenes,
@@ -55,6 +56,7 @@ export const App: React.FC = () => {
   const [unionAudit, setUnionAudit] = useState<UnionAudit | null>(null);
   const [isChaosOpen, setIsChaosOpen] = useState(false);
   const [isMemoOpen, setIsMemoOpen] = useState(false);
+  const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isGeneratingGemini, setIsGeneratingGemini] = useState(false);
@@ -434,6 +436,7 @@ export const App: React.FC = () => {
         hasProduction={Boolean(solution && solution.days && solution.days.length > 0)}
         onOpenChaos={() => setIsChaosOpen(true)}
         onOpenMemo={() => setIsMemoOpen(true)}
+        onOpenVersions={() => setIsVersionsOpen(true)}
         onOpenImport={() => setIsImportOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onReset={handleReset}
@@ -901,6 +904,17 @@ export const App: React.FC = () => {
           fetchUnionAudit().then(setUnionAudit).catch(() => null);
         }}
         isSaving={isSolving}
+      />
+
+      {/* Schedule Version Control & Diff Modal */}
+      <VersionModal
+        isOpen={isVersionsOpen}
+        onClose={() => setIsVersionsOpen(false)}
+        onVersionRestored={(newSolution) => {
+          setSolution(newSolution);
+          loadData();
+        }}
+        currentSolution={solution}
       />
     </div>
   );

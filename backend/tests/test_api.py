@@ -358,3 +358,77 @@ def test_soft_locks_toggle_and_clear():
     sol_cleared = clear_res.json()
     assert len(sol_cleared.get("soft_locks", {})) == 0
 
+def test_versions_save_restore_diff():
+    # 1. Reset baseline
+    client.post("/api/schedule/reset")
+    
+    # 2. Check initial versions list
+    v_res = client.get("/api/versions")
+    assert v_res.status_code == 200
+    versions = v_res.json()
+    assert len(versions) >= 1
+    v1 = versions[0]
+    assert "version_id" in v1
+    v1_id = v1["version_id"]
+
+    # 3. Save a new version explicitly
+    save_res = client.post("/api/versions", json={
+        "label": "Version 1 Snapshot",
+        "notes": "Testing version snapshot"
+    })
+    assert save_res.status_code == 200
+    v_saved = save_res.json()
+    assert v_saved["label"] == "Version 1 Snapshot"
+    v_saved_id = v_saved["version_id"]
+
+    # 4. Modify current WIP by injecting a disruption (Actor Sarah sick on Day 2)
+    disrupt_res = client.post("/api/schedule/disrupt", json={
+        "alert_id": "test_actor_diff",
+        "production_id": "prod_neon_horizon",
+        "disruption_type": "ACTOR_ILLNESS",
+        "severity": "CRITICAL",
+        "affected_actor_id": "ACTOR_SARAH",
+        "affected_shoot_days": [2],
+        "reason": "Sarah throat infection"
+    })
+    assert disrupt_res.status_code == 200
+
+    # 5. Diff saved version vs current WIP
+    diff_wip_res = client.post("/api/versions/diff", json={
+        "base_version_id": v_saved_id,
+        "target_version_id": "current_wip"
+    })
+    assert diff_wip_res.status_code == 200
+    diff_wip = diff_wip_res.json()
+    assert diff_wip["base_version_id"] == v_saved_id
+    assert diff_wip["target_version_id"] == "current_wip"
+    assert "actor_changes" in diff_wip
+    assert "summary_text" in diff_wip
+
+    # 6. Save WIP as Version 2
+    save_v2_res = client.post("/api/versions", json={
+        "label": "Version 2 (Sarah Illness)",
+        "notes": "Rescheduled after illness"
+    })
+    assert save_v2_res.status_code == 200
+    v2 = save_v2_res.json()
+    v2_id = v2["version_id"]
+
+    # 7. Diff Version 1 vs Version 2
+    diff_v1_v2 = client.post("/api/versions/diff", json={
+        "base_version_id": v_saved_id,
+        "target_version_id": v2_id
+    })
+    assert diff_v1_v2.status_code == 200
+    diff_data = diff_v1_v2.json()
+    assert diff_data["base_version_id"] == v_saved_id
+    assert diff_data["target_version_id"] == v2_id
+    assert len(diff_data["actor_changes"]) >= 1
+
+    # 8. Restore Version 1
+    restore_res = client.post(f"/api/versions/{v_saved_id}/restore")
+    assert restore_res.status_code == 200
+    restored_sol = restore_res.json()
+    assert restored_sol["status"] in ["OPTIMAL", "FEASIBLE"]
+
+

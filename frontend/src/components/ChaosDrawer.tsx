@@ -144,33 +144,42 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md bg-slate-900 border-l border-slate-800 h-full overflow-y-auto p-6 flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div className="w-full max-w-4xl max-h-[92vh] bg-slate-900 border-2 border-rose-600/50 rounded-2xl p-6 sm:p-7 shadow-2xl shadow-rose-950/80 ring-1 ring-rose-500/30 overflow-y-auto flex flex-col my-auto">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400">
-              <Flame className="w-5 h-5" />
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-600 to-red-700 border border-rose-400/40 flex items-center justify-center text-white shadow-lg shadow-rose-600/30">
+              <Flame className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white tracking-tight">Throw Chaos at Production</h3>
-              <p className="text-xs text-slate-400">Simulate real-world production emergencies</p>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-lg text-white tracking-tight">THROW PRODUCTION CHAOS</h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-500/20 text-rose-300 border border-rose-500/40 tracking-wider">
+                  Emergency Simulation Lab
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">Simulate real-world film production emergencies, COVID blackouts, weather floods, and sudden shutdown</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* 1-Click Production Chaos Presets */}
-        <div className="my-5">
-          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-            <Activity className="w-3.5 h-3.5 text-amber-400" />
-            1-Click Disruption Presets
-          </h4>
+        {/* 2-Column Wide Grid Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4">
+          {/* Left Column: 1-Click Presets & Sudden Day Shutdown */}
+          <div className="space-y-4">
+            {/* 1-Click Production Chaos Presets */}
+            <div>
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-amber-400" />
+                1-Click Disruption Presets
+              </h4>
           <div className="space-y-2">
             <button
               onClick={() => triggerPreset('SARAH_COVID')}
@@ -318,10 +327,13 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             </span>
           </button>
         </div>
+      </div>
 
-        {/* Custom Chaos Form */}
-        <div className="border-t border-slate-800 pt-5">
-          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
+      {/* Right Column: Custom Chaos Builder & Staged Batch */}
+      <div className="space-y-4">
+        <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3 shadow-lg">
+          <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
             Custom Disruption Injection
           </h4>
           <form onSubmit={handleInjectCustom} className="space-y-3.5">
@@ -541,9 +553,11 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             </div>
           )}
         </div>
+      </div>
+    </div>
 
-        {/* Active Disruptions Ingested */}
-        {activeDisruptions.length > 0 && (
+    {/* Active Disruptions Ingested */}
+    {activeDisruptions.length > 0 && (
           <div className="border-t border-slate-800 mt-6 pt-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
