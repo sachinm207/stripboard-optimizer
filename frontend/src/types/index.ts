@@ -111,77 +111,51 @@ export interface KafkaStatus {
   active_websocket_subscribers: number;
 }
 
-export interface ScheduleVersion {
+export interface ConstraintVersion {
   version_id: string;
   version_number: number;
   label: string;
   notes?: string;
   created_at: string;
   production_id: string;
-  total_days: number;
-  total_cost: number;
-  company_moves: number;
-  hold_days: number;
-  solution: ScheduleSolution;
-  scenes: Scene[];
-  actors: Actor[];
+  dark_days: number[];
   actor_blackouts: Record<string, number[]>;
   location_blackouts: Record<string, number[]>;
-  dark_days: number[];
-  soft_locks: Record<string, number[]>;
   active_disruptions: DisruptionAlert[];
 }
 
-export interface VersionDiffActorChange {
+export interface ActorBlackoutDiff {
   actor_id: string;
   actor_name: string;
-  character_name: string;
-  work_days_before: number[];
-  work_days_after: number[];
-  hold_days_before: number;
-  hold_days_after: number;
-  status_changes: Record<number, { before: string; after: string }>;
-  cost_before: number;
-  cost_after: number;
+  added_off_days: number[];
+  removed_off_days: number[];
 }
 
-export interface VersionDiffLocationChange {
+export interface LocationBlackoutDiff {
   location: string;
-  days_before: number[];
-  days_after: number[];
-  scenes_count_before: number;
-  scenes_count_after: number;
+  added_off_days: number[];
+  removed_off_days: number[];
 }
 
-export interface VersionDiffDayChange {
-  day_number: number;
-  is_dark_before: boolean;
-  is_dark_after: boolean;
-  dark_reason_before?: string;
-  dark_reason_after?: string;
-  scenes_before: string[];
-  scenes_after: string[];
-  scenes_added: string[];
-  scenes_removed: string[];
-  duration_before: number;
-  duration_after: number;
-  locations_before: string[];
-  locations_after: string[];
+export interface ChaosDisruptionDiff {
+  alert_id: string;
+  disruption_type: string;
+  affected_days: number[];
+  reason: string;
+  change_type: 'added' | 'removed';
 }
 
-export interface VersionDiffResult {
+export interface ConstraintDiffResult {
   base_version_id: string;
   base_label: string;
   target_version_id: string;
   target_label: string;
-  cost_delta: number;
-  moves_delta: number;
-  hold_days_delta: number;
-  turnaround_delta: number;
-  actor_changes: VersionDiffActorChange[];
-  location_changes: VersionDiffLocationChange[];
-  day_changes: VersionDiffDayChange[];
   dark_days_added: number[];
   dark_days_removed: number[];
+  actor_blackouts_diff: ActorBlackoutDiff[];
+  location_blackouts_diff: LocationBlackoutDiff[];
+  chaos_disruptions_diff: ChaosDisruptionDiff[];
+  total_changes_count: number;
   summary_text: string;
 }
+

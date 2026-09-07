@@ -361,7 +361,7 @@ def test_soft_locks_toggle_and_clear():
 def test_versions_save_restore_diff():
     # 1. Reset baseline
     client.post("/api/schedule/reset")
-    
+
     # 2. Check initial versions list
     v_res = client.get("/api/versions")
     assert v_res.status_code == 200
@@ -373,25 +373,32 @@ def test_versions_save_restore_diff():
 
     # 3. Save a new version explicitly
     save_res = client.post("/api/versions", json={
-        "label": "Version 1 Snapshot",
-        "notes": "Testing version snapshot"
+        "label": "Version 1 Baseline Snapshot",
+        "notes": "Testing hard constraints version"
     })
     assert save_res.status_code == 200
     v_saved = save_res.json()
-    assert v_saved["label"] == "Version 1 Snapshot"
+    assert v_saved["label"] == "Version 1 Baseline Snapshot"
     v_saved_id = v_saved["version_id"]
 
-    # 4. Modify current WIP by injecting a disruption (Actor Sarah sick on Day 2)
-    disrupt_res = client.post("/api/schedule/disrupt", json={
-        "alert_id": "test_actor_diff",
-        "production_id": "prod_neon_horizon",
-        "disruption_type": "ACTOR_ILLNESS",
-        "severity": "CRITICAL",
-        "affected_actor_id": "ACTOR_SARAH",
-        "affected_shoot_days": [2],
-        "reason": "Sarah throat infection"
+    # 4. Modify current WIP hard constraints:
+    # - Add Dark Day 3 (Company off day)
+    # - Add Actor Sarah blackout Day 2
+    # - Add Location Warehouse blackout Day 1
+    # - Throw Chaos: Force Majeure Day 5 shutdown
+    client.post("/api/production/constraints", json={
+        "dark_days": [3],
+        "actor_blackouts": {"ACTOR_SARAH": [2]},
+        "location_blackouts": {"Warehouse District": [1]}
     })
-    assert disrupt_res.status_code == 200
+    client.post("/api/schedule/disrupt", json={
+        "alert_id": "test_chaos_01",
+        "production_id": "prod_neon_horizon",
+        "disruption_type": "DAY_SHUTDOWN",
+        "severity": "CRITICAL",
+        "affected_shoot_days": [5],
+        "reason": "Sudden emergency curfew"
+    })
 
     # 5. Diff saved version vs current WIP
     diff_wip_res = client.post("/api/versions/diff", json={
@@ -402,13 +409,16 @@ def test_versions_save_restore_diff():
     diff_wip = diff_wip_res.json()
     assert diff_wip["base_version_id"] == v_saved_id
     assert diff_wip["target_version_id"] == "current_wip"
-    assert "actor_changes" in diff_wip
-    assert "summary_text" in diff_wip
+    assert 3 in diff_wip["dark_days_added"]
+    assert any(a["actor_id"] == "ACTOR_SARAH" and 2 in a["added_off_days"] for a in diff_wip["actor_blackouts_diff"])
+    assert any(l["location"] == "Warehouse District" and 1 in l["added_off_days"] for l in diff_wip["location_blackouts_diff"])
+    assert any(c["alert_id"] == "test_chaos_01" for c in diff_wip["chaos_disruptions_diff"])
+    assert diff_wip["total_changes_count"] >= 4
 
     # 6. Save WIP as Version 2
     save_v2_res = client.post("/api/versions", json={
-        "label": "Version 2 (Sarah Illness)",
-        "notes": "Rescheduled after illness"
+        "label": "Version 2 Constraints",
+        "notes": "Added dark day and blackouts"
     })
     assert save_v2_res.status_code == 200
     v2 = save_v2_res.json()
@@ -423,12 +433,14 @@ def test_versions_save_restore_diff():
     diff_data = diff_v1_v2.json()
     assert diff_data["base_version_id"] == v_saved_id
     assert diff_data["target_version_id"] == v2_id
-    assert len(diff_data["actor_changes"]) >= 1
+    assert 3 in diff_data["dark_days_added"]
+    assert len(diff_data["actor_blackouts_diff"]) >= 1
 
-    # 8. Restore Version 1
+    # 8. Restore Version 1 Baseline
     restore_res = client.post(f"/api/versions/{v_saved_id}/restore")
     assert restore_res.status_code == 200
     restored_sol = restore_res.json()
     assert restored_sol["status"] in ["OPTIMAL", "FEASIBLE"]
+
 
 

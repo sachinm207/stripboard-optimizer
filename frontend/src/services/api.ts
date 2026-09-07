@@ -6,8 +6,8 @@ import {
   KafkaStatus,
   UnionAudit,
   ProductionConstraints,
-  ScheduleVersion,
-  VersionDiffResult,
+  ConstraintVersion,
+  ConstraintDiffResult,
 } from '../types';
 
 const API_BASE = '/api';
@@ -227,13 +227,13 @@ export async function clearSoftLocks(): Promise<ScheduleSolution> {
   return res.json();
 }
 
-export async function fetchVersions(): Promise<ScheduleVersion[]> {
+export async function fetchVersions(): Promise<ConstraintVersion[]> {
   const res = await fetch(`${API_BASE}/versions`);
   if (!res.ok) throw new Error('Failed to fetch versions');
   return res.json();
 }
 
-export async function saveVersion(label?: string, notes?: string): Promise<ScheduleVersion> {
+export async function saveVersion(label?: string, notes?: string): Promise<ConstraintVersion> {
   const res = await fetch(`${API_BASE}/versions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -259,7 +259,7 @@ export async function deleteVersion(versionId: string): Promise<{ status: string
   return res.json();
 }
 
-export async function diffVersions(baseVersionId: string, targetVersionId: string): Promise<VersionDiffResult> {
+export async function diffVersions(baseVersionId: string, targetVersionId: string): Promise<ConstraintDiffResult> {
   const res = await fetch(`${API_BASE}/versions/diff`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

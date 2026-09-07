@@ -14,14 +14,14 @@ from backend.app.models.actor import Actor
 from backend.app.models.disruption import DisruptionAlert
 from backend.app.models.schedule import ScheduleSolution, DaySchedule, ScheduleMetrics
 from backend.app.models.version import (
-    ScheduleVersion,
-    VersionDiffResult,
+    ConstraintVersion,
+    ConstraintDiffResult,
     CreateVersionRequest,
     DiffVersionsRequest
 )
 from backend.app.solver.cp_sat_model import StripboardSolver, generate_naive_schedule
 from backend.app.solver.dood_calculator import calculate_dood_matrix
-from backend.app.solver.version_diff import compute_version_diff
+from backend.app.solver.version_diff import compute_constraint_diff
 from backend.app.kafka.bus import event_bus, ALL_TOPICS
 from backend.app.agents.memo_agent import ExecutiveMemoAgent
 from backend.app.agents.union_agent import UnionComplianceAgent
@@ -50,37 +50,23 @@ STATE = {
     "versions": [],
 }
 
-def create_version_snapshot(label: Optional[str] = None, notes: Optional[str] = None) -> ScheduleVersion:
-    if not STATE.get("current_solution"):
-        raise HTTPException(status_code=400, detail="No schedule solution available to snapshot")
-
+def create_version_snapshot(label: Optional[str] = None, notes: Optional[str] = None) -> ConstraintVersion:
     version_num = len(STATE.get("versions", [])) + 1
     version_id = f"v{version_num}_{int(datetime.datetime.now(datetime.timezone.utc).timestamp())}"
-    actual_label = label or f"Version {version_num} ({datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')})"
+    actual_label = label or f"Constraint Snapshot v{version_num} ({datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')})"
 
-    sol_copy = STATE["current_solution"].model_copy(deep=True)
-    scenes_copy = [s.model_copy(deep=True) for s in STATE.get("scenes", [])]
-    actors_copy = [a.model_copy(deep=True) for a in STATE.get("actors", [])]
     disruptions_copy = [d.model_copy(deep=True) for d in STATE.get("active_disruptions", [])]
 
-    version = ScheduleVersion(
+    version = ConstraintVersion(
         version_id=version_id,
         version_number=version_num,
         label=actual_label,
         notes=notes,
         created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         production_id=STATE.get("production_id") or "prod_neon_horizon",
-        total_days=len(sol_copy.days),
-        total_cost=sol_copy.metrics.objective_cost,
-        company_moves=sol_copy.metrics.total_company_moves,
-        hold_days=sol_copy.metrics.total_hold_days,
-        solution=sol_copy,
-        scenes=scenes_copy,
-        actors=actors_copy,
-        actor_blackouts={k: list(v) for k, v in STATE.get("actor_blackouts", {}).items()},
-        location_blackouts={k: list(v) for k, v in STATE.get("location_blackouts", {}).items()},
         dark_days=list(STATE.get("dark_days", [])),
-        soft_locks={k: list(v) for k, v in STATE.get("soft_locks", {}).items()},
+        actor_blackouts={k: list(v) for k, v in STATE.get("actor_blackouts", {}).items() if v},
+        location_blackouts={k: list(v) for k, v in STATE.get("location_blackouts", {}).items() if v},
         active_disruptions=disruptions_copy
     )
     return version
@@ -710,6 +696,9 @@ async def inject_disruption_batch(req: DisruptBatchRequest):
 async def reset_schedule():
     STATE["active_disruptions"] = []
     STATE["soft_locks"] = {}
+    STATE["dark_days"] = []
+    STATE["actor_blackouts"] = {}
+    STATE["location_blackouts"] = {}
     for s in STATE["scenes"]:
         s.locked_day = None
     solution = run_solver(disruptions=[])
@@ -745,16 +734,16 @@ def get_union_audit():
         raise HTTPException(status_code=404, detail="No schedule available to audit")
     return union_agent.audit_schedule(STATE["current_solution"])
 
-@app.get("/api/versions", response_model=List[ScheduleVersion])
+@app.get("/api/versions", response_model=List[ConstraintVersion])
 def get_versions():
     if not STATE.get("versions") and STATE.get("current_solution"):
         try:
-            STATE["versions"] = [create_version_snapshot("Baseline Schedule (v1)", "Initial production baseline")]
+            STATE["versions"] = [create_version_snapshot("Baseline Constraints (v1)", "Initial production baseline constraints")]
         except Exception:
             pass
     return STATE.get("versions", [])
 
-@app.post("/api/versions", response_model=ScheduleVersion)
+@app.post("/api/versions", response_model=ConstraintVersion)
 async def save_version(req: Optional[CreateVersionRequest] = None):
     label = req.label if req and req.label else None
     notes = req.notes if req and req.notes else None
@@ -767,7 +756,7 @@ async def save_version(req: Optional[CreateVersionRequest] = None):
     })
     return version
 
-@app.get("/api/versions/{version_id}", response_model=ScheduleVersion)
+@app.get("/api/versions/{version_id}", response_model=ConstraintVersion)
 def get_version(version_id: str):
     for v in STATE.get("versions", []):
         if v.version_id == version_id:
@@ -784,14 +773,14 @@ async def restore_version(version_id: str):
     if not target_v:
         raise HTTPException(status_code=404, detail=f"Version '{version_id}' not found")
 
-    STATE["scenes"] = [s.model_copy(deep=True) for s in target_v.scenes]
-    STATE["actors"] = [a.model_copy(deep=True) for a in target_v.actors]
     STATE["actor_blackouts"] = {k: list(val) for k, val in target_v.actor_blackouts.items()}
     STATE["location_blackouts"] = {k: list(val) for k, val in target_v.location_blackouts.items()}
     STATE["dark_days"] = list(target_v.dark_days)
-    STATE["soft_locks"] = {k: list(val) for k, val in target_v.soft_locks.items()}
     STATE["active_disruptions"] = [d.model_copy(deep=True) for d in target_v.active_disruptions]
-    STATE["current_solution"] = target_v.solution.model_copy(deep=True)
+
+    solution = run_solver(disruptions=STATE["active_disruptions"])
+    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
+    STATE["current_solution"] = solution
 
     await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
     return STATE["current_solution"]
@@ -805,23 +794,24 @@ def delete_version(version_id: str):
     STATE["versions"] = filtered
     return {"status": "deleted", "version_id": version_id}
 
-@app.post("/api/versions/diff", response_model=VersionDiffResult)
+@app.post("/api/versions/diff", response_model=ConstraintDiffResult)
 def diff_versions(req: DiffVersionsRequest):
     if req.base_version_id == "current_wip":
-        base_v = create_version_snapshot("Current Work In Progress (WIP)", "Live working changes")
+        base_v = create_version_snapshot("Current Work In Progress (WIP)", "Live working hard constraints")
     else:
         base_v = next((v for v in STATE.get("versions", []) if v.version_id == req.base_version_id), None)
         if not base_v:
             raise HTTPException(status_code=404, detail=f"Base version '{req.base_version_id}' not found")
 
     if req.target_version_id == "current_wip":
-        target_v = create_version_snapshot("Current Work In Progress (WIP)", "Live working changes")
+        target_v = create_version_snapshot("Current Work In Progress (WIP)", "Live working hard constraints")
     else:
         target_v = next((v for v in STATE.get("versions", []) if v.version_id == req.target_version_id), None)
         if not target_v:
             raise HTTPException(status_code=404, detail=f"Target version '{req.target_version_id}' not found")
 
-    res = compute_version_diff(base_v, target_v)
+    actors_map = {a.actor_id: a.name for a in STATE.get("actors", [])}
+    res = compute_constraint_diff(base_v, target_v, actors_map=actors_map)
     if req.base_version_id == "current_wip":
         res.base_version_id = "current_wip"
         res.base_label = "Current Work In Progress (WIP)"

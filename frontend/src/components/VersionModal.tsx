@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   History,
-  GitCompare,
   Save,
   RotateCcw,
   Trash2,
@@ -11,17 +10,15 @@ import {
   AlertTriangle,
   Users,
   MapPin,
-  Calendar,
+  Moon,
+  Flame,
   CheckCircle2,
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Sparkles,
   Info,
+  ShieldAlert,
 } from 'lucide-react';
 import {
-  ScheduleVersion,
-  VersionDiffResult,
+  ConstraintVersion,
+  ConstraintDiffResult,
   ScheduleSolution,
 } from '../types';
 import {
@@ -45,11 +42,11 @@ export const VersionModal: React.FC<VersionModalProps> = ({
   onVersionRestored,
   currentSolution,
 }) => {
-  const [versions, setVersions] = useState<ScheduleVersion[]>([]);
+  const [versions, setVersions] = useState<ConstraintVersion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // New version creation inputs
+  // New version creation
   const [newLabel, setNewLabel] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -57,11 +54,10 @@ export const VersionModal: React.FC<VersionModalProps> = ({
   // Diff comparison states
   const [baseVersionId, setBaseVersionId] = useState<string>('');
   const [targetVersionId, setTargetVersionId] = useState<string>('current_wip');
-  const [diffResult, setDiffResult] = useState<VersionDiffResult | null>(null);
+  const [diffResult, setDiffResult] = useState<ConstraintDiffResult | null>(null);
   const [isDiffing, setIsDiffing] = useState(false);
-  const [activeDiffTab, setActiveDiffTab] = useState<'scenes' | 'actors' | 'locations' | 'dark_days'>('scenes');
+  const [activeCategory, setActiveCategory] = useState<'dark_days' | 'actors' | 'locations' | 'chaos'>('dark_days');
 
-  // Load versions
   const loadVersionsList = async () => {
     try {
       setIsLoading(true);
@@ -72,7 +68,7 @@ export const VersionModal: React.FC<VersionModalProps> = ({
         setBaseVersionId(data[0].version_id);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load version history');
+      setError(err.message || 'Failed to load constraint versions');
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +80,6 @@ export const VersionModal: React.FC<VersionModalProps> = ({
     }
   }, [isOpen]);
 
-  // Compute diff when base or target changes
   const runDiff = async (baseId: string, targetId: string) => {
     if (!baseId || !targetId) return;
     try {
@@ -93,7 +88,7 @@ export const VersionModal: React.FC<VersionModalProps> = ({
       const result = await diffVersions(baseId, targetId);
       setDiffResult(result);
     } catch (err: any) {
-      setError(err.message || 'Failed to compute diff');
+      setError(err.message || 'Failed to compute constraint diff');
     } finally {
       setIsDiffing(false);
     }
@@ -118,17 +113,16 @@ export const VersionModal: React.FC<VersionModalProps> = ({
       setNewLabel('');
       setNewNotes('');
       await loadVersionsList();
-      // Auto select newly created version for diffing
       setTargetVersionId(created.version_id);
     } catch (err: any) {
-      setError(err.message || 'Failed to save version snapshot');
+      setError(err.message || 'Failed to save constraint version');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleRestore = async (versionId: string, label: string) => {
-    const confirmMsg = `Are you sure you want to restore "${label}"? This will replace the current working schedule.`;
+    const confirmMsg = `Restore hard constraints from "${label}"? This will reapply the saved dark days, actor/location blackouts, and chaos disruptions.`;
     if (!window.confirm(confirmMsg)) return;
 
     try {
@@ -139,14 +133,14 @@ export const VersionModal: React.FC<VersionModalProps> = ({
       await loadVersionsList();
       runDiff(versionId, 'current_wip');
     } catch (err: any) {
-      setError(err.message || 'Failed to restore version');
+      setError(err.message || 'Failed to restore constraints');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDelete = async (versionId: string) => {
-    if (!window.confirm('Delete this version snapshot?')) return;
+    if (!window.confirm('Delete this saved constraint version?')) return;
     try {
       setError(null);
       await deleteVersion(versionId);
@@ -166,7 +160,7 @@ export const VersionModal: React.FC<VersionModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="w-full max-w-6xl max-h-[94vh] bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl flex flex-col my-auto overflow-hidden">
+      <div className="w-full max-w-5xl max-h-[94vh] bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl flex flex-col my-auto overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
@@ -176,14 +170,14 @@ export const VersionModal: React.FC<VersionModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-base sm:text-lg text-white tracking-tight">
-                  SCHEDULE VERSION CONTROL & DIFF EXPLORER
+                  HARD CONSTRAINTS VERSION CONTROL & DIFF
                 </h3>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                  {versions.length} Saved Versions
+                  {versions.length} Saved Snapshots
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Snapshot milestones, track changes in your work-in-progress, and compare actor DOOD, location shifts, and scene movements.
+                Track and compare changes to <strong>hard constraints only</strong>: Preplanned company dark days, actor contract blackouts, location permit freezes, and sudden chaos disruptions.
               </p>
             </div>
           </div>
@@ -202,11 +196,11 @@ export const VersionModal: React.FC<VersionModalProps> = ({
           </div>
         )}
 
-        {/* Modal Body: Two Columns */}
+        {/* Modal Body */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 my-4 flex-1 min-h-0 overflow-y-auto pr-1">
-          {/* Left Column: Version History List & Snapshot Form (4 cols) */}
+          {/* Left Column: Version History List & Snapshot Form (5 cols) */}
           <div className="lg:col-span-5 space-y-4 flex flex-col">
-            {/* Create Version Snapshot Form */}
+            {/* Create Snapshot Form */}
             <form
               onSubmit={handleCreateVersion}
               className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3 shadow-inner shrink-0"
@@ -214,7 +208,7 @@ export const VersionModal: React.FC<VersionModalProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-1.5">
                   <Save className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Snapshot Current Schedule as Version</span>
+                  <span>Snapshot Current Hard Constraints</span>
                 </span>
                 <span className="text-[10px] text-slate-400 font-mono">
                   v{versions.length + 1}
@@ -222,14 +216,14 @@ export const VersionModal: React.FC<VersionModalProps> = ({
               </div>
               <input
                 type="text"
-                placeholder="e.g., Post-Flood Reschedule / Director Cut"
+                placeholder="e.g., Added Day 3 Hiatus & Sarah Blackout"
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
               />
               <input
                 type="text"
-                placeholder="Optional notes or rationale..."
+                placeholder="Optional notes or reason for constraint change..."
                 value={newNotes}
                 onChange={(e) => setNewNotes(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
@@ -240,18 +234,18 @@ export const VersionModal: React.FC<VersionModalProps> = ({
                 className="w-full py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-purple-600/30 transition-all cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>{isSaving ? 'Creating Snapshot...' : 'Save Current State as New Version'}</span>
+                <span>{isSaving ? 'Saving Snapshot...' : 'Save Current Constraints as Version'}</span>
               </button>
             </form>
 
             {/* Saved Versions List */}
             <div className="flex-1 space-y-2.5 overflow-y-auto pr-1">
               <div className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                <span>Version Timeline</span>
-                <span className="text-[11px] text-slate-500 font-normal">Newest on top</span>
+                <span>Saved Versions</span>
+                <span className="text-[11px] text-slate-500 font-normal">Select below to inspect</span>
               </div>
 
-              {/* Current WIP Entry */}
+              {/* Current Work In Progress Item */}
               <div
                 onClick={() => setTargetVersionId('current_wip')}
                 className={`p-3 rounded-xl border transition-all cursor-pointer ${
@@ -266,17 +260,17 @@ export const VersionModal: React.FC<VersionModalProps> = ({
                     <span className="font-bold text-xs text-amber-300">Current Work In Progress (WIP)</span>
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                    Live Unsaved
+                    Live Working State
                   </span>
                 </div>
-                <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-400 font-mono">
-                  <span>Days: {currentSolution?.days.length || 0}</span>
-                  <span>Cost: ${(currentSolution?.metrics.objective_cost || 0).toLocaleString()}</span>
-                  <span>Moves: {currentSolution?.metrics.total_company_moves || 0}</span>
+                <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-400">
+                  <span>🌙 Dark: {(currentSolution?.dark_days || []).length} days</span>
+                  <span>🚫 Actor Blackouts: {Object.keys(currentSolution?.actor_blackouts || {}).length}</span>
+                  <span>🚨 Chaos: {(currentSolution?.disruptions_applied || []).length}</span>
                 </div>
               </div>
 
-              {/* Saved Versions */}
+              {/* Saved Version Cards */}
               {versions.map((v) => {
                 const isBase = baseVersionId === v.version_id;
                 const isTarget = targetVersionId === v.version_id;
@@ -316,7 +310,7 @@ export const VersionModal: React.FC<VersionModalProps> = ({
                           type="button"
                           onClick={() => handleRestore(v.version_id, v.label)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
-                          title="Restore schedule to this version"
+                          title="Restore hard constraints to this version"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                         </button>
@@ -334,10 +328,10 @@ export const VersionModal: React.FC<VersionModalProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-800/60 text-[11px]">
-                      <div className="flex items-center gap-3 text-slate-400 font-mono">
-                        <span>${v.total_cost.toLocaleString()}</span>
-                        <span>{v.total_days} Days</span>
-                        <span>{v.company_moves} Move{v.company_moves !== 1 ? 's' : ''}</span>
+                      <div className="flex items-center gap-2.5 text-slate-400 text-[10px]">
+                        <span>🌙 {v.dark_days.length} Dark Days</span>
+                        <span>🚫 {Object.keys(v.actor_blackouts).length} Actors Off</span>
+                        <span>🚨 {v.active_disruptions.length} Chaos</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
@@ -370,7 +364,7 @@ export const VersionModal: React.FC<VersionModalProps> = ({
             </div>
           </div>
 
-          {/* Right Column: Diff Comparison Inspector (7 cols) */}
+          {/* Right Column: Hard Constraints Diff Inspector (7 cols) */}
           <div className="lg:col-span-7 flex flex-col space-y-4">
             {/* Version Diff Selector Bar */}
             <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-inner shrink-0">
@@ -411,215 +405,259 @@ export const VersionModal: React.FC<VersionModalProps> = ({
               </div>
             </div>
 
-            {/* Diff Result Summary Cards */}
+            {/* Changes Metric Summary Bar */}
             {diffResult && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
-                {/* Cost Delta */}
+                {/* Total Changes */}
                 <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
-                    <span>Budget Cost</span>
-                    <DollarSign className="w-3 h-3 text-slate-500" />
-                  </div>
-                  <div className="text-base font-black mt-1 flex items-center gap-1">
-                    {diffResult.cost_delta > 0 ? (
-                      <span className="text-rose-400 flex items-center gap-0.5">
-                        <TrendingUp className="w-3.5 h-3.5" />
-                        +${diffResult.cost_delta.toLocaleString()}
-                      </span>
-                    ) : diffResult.cost_delta < 0 ? (
-                      <span className="text-emerald-400 flex items-center gap-0.5">
-                        <TrendingDown className="w-3.5 h-3.5" />
-                        -${Math.abs(diffResult.cost_delta).toLocaleString()}
-                      </span>
-                    ) : (
-                      <span className="text-slate-300 font-mono">$0</span>
-                    )}
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">
-                    {diffResult.cost_delta > 0
-                      ? 'Increased spend'
-                      : diffResult.cost_delta < 0
-                      ? 'Saved vs base'
-                      : 'No net cost shift'}
-                  </div>
-                </div>
-
-                {/* Company Moves Delta */}
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                  <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
-                    <span>Company Moves</span>
-                    <MapPin className="w-3 h-3 text-slate-500" />
-                  </div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold">Total Constraints Shift</div>
                   <div className="text-base font-black font-mono mt-1 text-white">
-                    {diffResult.moves_delta > 0
-                      ? `+${diffResult.moves_delta}`
-                      : diffResult.moves_delta}
+                    {diffResult.total_changes_count} changes
                   </div>
                   <div className="text-[10px] text-slate-400 mt-0.5">
-                    {diffResult.moves_delta > 0
-                      ? 'Additional moves'
-                      : diffResult.moves_delta < 0
-                      ? 'Fewer moves'
-                      : 'Same move count'}
+                    {diffResult.total_changes_count === 0 ? 'Identical hard rules' : 'Hard rules modified'}
                   </div>
                 </div>
 
-                {/* Actor Hold Days Delta */}
+                {/* Dark Days Added / Removed */}
                 <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
                   <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
-                    <span>Hold Days</span>
-                    <Users className="w-3 h-3 text-slate-500" />
+                    <span>Company Off Days</span>
+                    <Moon className="w-3 h-3 text-indigo-400" />
                   </div>
-                  <div className="text-base font-black font-mono mt-1 text-white">
-                    {diffResult.hold_days_delta > 0
-                      ? `+${diffResult.hold_days_delta}`
-                      : diffResult.hold_days_delta}
+                  <div className="text-sm font-black font-mono mt-1 text-indigo-300">
+                    +{diffResult.dark_days_added.length} / -{diffResult.dark_days_removed.length}
                   </div>
                   <div className="text-[10px] text-slate-400 mt-0.5">
-                    {diffResult.hold_days_delta > 0
-                      ? 'More idle hold days'
-                      : diffResult.hold_days_delta < 0
-                      ? 'Reduced actor hold'
-                      : 'Same hold days'}
+                    {diffResult.dark_days_added.length > 0
+                      ? `Added: ${diffResult.dark_days_added.map((d) => `D${d}`).join(', ')}`
+                      : 'No dark days added'}
                   </div>
                 </div>
 
-                {/* Affected Actors / Days */}
+                {/* Actor Blackouts */}
                 <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
                   <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
-                    <span>Impact Scope</span>
-                    <Calendar className="w-3 h-3 text-slate-500" />
+                    <span>Actor Off Days</span>
+                    <Users className="w-3 h-3 text-rose-400" />
                   </div>
-                  <div className="text-sm font-black mt-1 text-purple-300">
-                    {diffResult.actor_changes.length} Actors / {diffResult.day_changes.length} Days
+                  <div className="text-sm font-black font-mono mt-1 text-rose-300">
+                    {diffResult.actor_blackouts_diff.length} Actors Changed
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    Contract blackouts
+                  </div>
+                </div>
+
+                {/* Sudden Chaos */}
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
+                    <span>Sudden Chaos</span>
+                    <Flame className="w-3 h-3 text-amber-400" />
+                  </div>
+                  <div className="text-sm font-black font-mono mt-1 text-amber-300">
+                    {diffResult.chaos_disruptions_diff.length} Disruptions
                   </div>
                   <div className="text-[10px] text-slate-400 mt-0.5 truncate">
-                    {diffResult.location_changes.length} location shifts
+                    Emergency injections
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Granular Diff Category Tabs */}
+            {/* Category Navigation Tabs */}
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2 shrink-0">
               <button
                 type="button"
-                onClick={() => setActiveDiffTab('scenes')}
+                onClick={() => setActiveCategory('dark_days')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeDiffTab === 'scenes'
+                  activeCategory === 'dark_days'
                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
                     : 'bg-slate-800/80 text-slate-400 hover:text-white'
                 }`}
               >
-                <span>🎬 Day & Scene Movements</span>
+                <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                <span>🌙 Company Off Days</span>
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/60">
-                  {diffResult?.day_changes.length || 0}
+                  {(diffResult?.dark_days_added.length || 0) + (diffResult?.dark_days_removed.length || 0)}
                 </span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setActiveDiffTab('actors')}
+                onClick={() => setActiveCategory('actors')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeDiffTab === 'actors'
+                  activeCategory === 'actors'
                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
                     : 'bg-slate-800/80 text-slate-400 hover:text-white'
                 }`}
               >
-                <span>🎭 Actor DOOD Shifts</span>
+                <Users className="w-3.5 h-3.5 text-rose-400" />
+                <span>🎭 Actor Off Days</span>
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/60">
-                  {diffResult?.actor_changes.length || 0}
+                  {diffResult?.actor_blackouts_diff.length || 0}
                 </span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setActiveDiffTab('locations')}
+                onClick={() => setActiveCategory('locations')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeDiffTab === 'locations'
+                  activeCategory === 'locations'
                     ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
                     : 'bg-slate-800/80 text-slate-400 hover:text-white'
                 }`}
               >
-                <span>📍 Location Shifts</span>
+                <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                <span>📍 Location Off Days</span>
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/60">
-                  {diffResult?.location_changes.length || 0}
+                  {diffResult?.location_blackouts_diff.length || 0}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveCategory('chaos')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeCategory === 'chaos'
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                    : 'bg-slate-800/80 text-slate-400 hover:text-white'
+                }`}
+              >
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                <span>🚨 Sudden Chaos</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900/60">
+                  {diffResult?.chaos_disruptions_diff.length || 0}
                 </span>
               </button>
             </div>
 
-            {/* Granular Diff Content Area */}
+            {/* Granular Diff Inspector Area */}
             <div className="flex-1 overflow-y-auto pr-1 space-y-3">
               {isDiffing ? (
                 <div className="py-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
                   <span className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                  <span>Comparing schedule versions...</span>
+                  <span>Comparing hard constraints...</span>
                 </div>
               ) : !diffResult ? (
                 <div className="py-12 text-center text-slate-500 text-xs">
-                  Select two versions above to inspect detailed differences.
+                  Select two constraint versions above to inspect differences.
                 </div>
               ) : (
                 <>
-                  {/* TAB 1: SCENE & DAY MOVEMENTS */}
-                  {activeDiffTab === 'scenes' && (
-                    <div className="space-y-2.5">
-                      {diffResult.day_changes.length === 0 ? (
+                  {/* CATEGORY 1: COMPANY PREPLANNED DARK DAYS */}
+                  {activeCategory === 'dark_days' && (
+                    <div className="space-y-3">
+                      {diffResult.dark_days_added.length === 0 && diffResult.dark_days_removed.length === 0 ? (
                         <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 text-slate-400 text-xs text-center flex items-center justify-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          <span>No scenes or shoot days moved between these two versions.</span>
+                          <span>No company preplanned dark day differences between these versions.</span>
                         </div>
                       ) : (
-                        diffResult.day_changes.map((dc) => (
+                        <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                          <div className="text-xs font-bold text-white flex items-center gap-2">
+                            <Moon className="w-4 h-4 text-indigo-400" />
+                            <span>Pre-Planned Dark Days (Company Hiatus / Festivals / Rest Days)</span>
+                          </div>
+
+                          {diffResult.dark_days_added.length > 0 && (
+                            <div className="flex items-start gap-2.5 text-xs text-indigo-200">
+                              <span className="px-2 py-0.5 rounded font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shrink-0">
+                                + Added Off Days:
+                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {diffResult.dark_days_added.map((d) => (
+                                  <span
+                                    key={d}
+                                    className="px-2.5 py-1 rounded bg-indigo-950 border border-indigo-600 font-mono font-bold text-xs shadow-sm"
+                                  >
+                                    🌙 Day {d} (Marked Dark Day)
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {diffResult.dark_days_removed.length > 0 && (
+                            <div className="flex items-start gap-2.5 text-xs text-emerald-200 pt-2 border-t border-slate-800/60">
+                              <span className="px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+                                - Reopened for Shoot:
+                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {diffResult.dark_days_removed.map((d) => (
+                                  <span
+                                    key={d}
+                                    className="px-2.5 py-1 rounded bg-slate-900 border border-slate-700 font-mono text-slate-300 text-xs"
+                                  >
+                                    🎬 Day {d} (Hiatus Removed)
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* CATEGORY 2: ACTOR PREPLANNED OFF DAYS */}
+                  {activeCategory === 'actors' && (
+                    <div className="space-y-2.5">
+                      {diffResult.actor_blackouts_diff.length === 0 ? (
+                        <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 text-slate-400 text-xs text-center flex items-center justify-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span>No actor contract blackouts or off-day differences between these versions.</span>
+                        </div>
+                      ) : (
+                        diffResult.actor_blackouts_diff.map((ab) => (
                           <div
-                            key={dc.day_number}
+                            key={ab.actor_id}
                             className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2"
                           >
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-xs text-amber-400 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30">
-                                  DAY {dc.day_number}
-                                </span>
-                                {dc.is_dark_after && !dc.is_dark_before && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
-                                    Marked as Dark Day
-                                  </span>
-                                )}
-                                {!dc.is_dark_after && dc.is_dark_before && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                                    Reopened from Dark Day
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[11px] text-slate-400 font-mono">
-                                Duration: {Math.floor(dc.duration_before / 60)}h{dc.duration_before % 60}m ➔{' '}
-                                <span className="text-white font-bold">
-                                  {Math.floor(dc.duration_after / 60)}h{dc.duration_after % 60}m
+                              <div className="font-bold text-xs text-white flex items-center gap-2">
+                                <Users className="w-3.5 h-3.5 text-rose-400" />
+                                <span>{ab.actor_name}</span>
+                                <span className="text-[10px] text-slate-500 font-mono font-normal">
+                                  ({ab.actor_id})
                                 </span>
                               </div>
                             </div>
 
-                            {/* Scenes Added / Removed */}
-                            <div className="space-y-1 text-xs">
-                              {dc.scenes_added.length > 0 && (
-                                <div className="flex items-center gap-2 text-emerald-300">
-                                  <span className="font-bold text-[11px]">+ Added:</span>
-                                  <span className="font-mono bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700">
-                                    {dc.scenes_added.join(', ')}
+                            <div className="space-y-1.5 text-xs pt-1 border-t border-slate-800/60">
+                              {ab.added_off_days.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] font-bold text-rose-300">
+                                    + Newly Blacked Out (Unavailable):
                                   </span>
+                                  <div className="flex items-center gap-1">
+                                    {ab.added_off_days.map((d) => (
+                                      <span
+                                        key={d}
+                                        className="px-2 py-0.5 rounded bg-rose-950 border border-rose-700 text-rose-200 font-mono font-bold text-[11px]"
+                                      >
+                                        🚫 Day {d}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
-                              {dc.scenes_removed.length > 0 && (
-                                <div className="flex items-center gap-2 text-rose-300">
-                                  <span className="font-bold text-[11px]">- Moved away:</span>
-                                  <span className="font-mono bg-rose-950/80 px-2 py-0.5 rounded border border-rose-700">
-                                    {dc.scenes_removed.join(', ')}
+
+                              {ab.removed_off_days.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] font-bold text-emerald-300">
+                                    - Blackout Cleared (Now Available):
                                   </span>
-                                </div>
-                              )}
-                              {dc.scenes_added.length === 0 && dc.scenes_removed.length === 0 && (
-                                <div className="text-slate-400 text-[11px]">
-                                  Same scenes scheduled ({dc.scenes_after.length} scenes).
+                                  <div className="flex items-center gap-1">
+                                    {ab.removed_off_days.map((d) => (
+                                      <span
+                                        key={d}
+                                        className="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-emerald-200 font-mono font-bold text-[11px]"
+                                      >
+                                        ✓ Day {d}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -629,139 +667,109 @@ export const VersionModal: React.FC<VersionModalProps> = ({
                     </div>
                   )}
 
-                  {/* TAB 2: ACTOR DOOD SHIFTS */}
-                  {activeDiffTab === 'actors' && (
+                  {/* CATEGORY 3: LOCATION PREPLANNED OFF DAYS */}
+                  {activeCategory === 'locations' && (
                     <div className="space-y-2.5">
-                      {diffResult.actor_changes.length === 0 ? (
+                      {diffResult.location_blackouts_diff.length === 0 ? (
                         <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 text-slate-400 text-xs text-center flex items-center justify-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          <span>No cast members' work or hold days changed between these versions.</span>
+                          <span>No location permit blackouts or off-day differences between these versions.</span>
                         </div>
                       ) : (
-                        diffResult.actor_changes.map((ac) => {
-                          const costDiff = ac.cost_after - ac.cost_before;
-                          const holdDiff = ac.hold_days_after - ac.hold_days_before;
+                        diffResult.location_blackouts_diff.map((lb) => (
+                          <div
+                            key={lb.location}
+                            className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-xs text-white flex items-center gap-2">
+                                <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                                <span>{lb.location}</span>
+                              </span>
+                            </div>
 
-                          return (
-                            <div
-                              key={ac.actor_id}
-                              className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="font-bold text-xs text-white flex items-center gap-2">
-                                    <span>{ac.character_name}</span>
-                                    <span className="text-slate-400 text-[11px]">({ac.actor_name})</span>
+                            <div className="space-y-1.5 text-xs pt-1 border-t border-slate-800/60">
+                              {lb.added_off_days.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] font-bold text-amber-300">
+                                    + Permit Freeze (No Filming):
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    {lb.added_off_days.map((d) => (
+                                      <span
+                                        key={d}
+                                        className="px-2 py-0.5 rounded bg-amber-950 border border-amber-700 text-amber-200 font-mono font-bold text-[11px]"
+                                      >
+                                        🚫 Day {d}
+                                      </span>
+                                    ))}
                                   </div>
                                 </div>
+                              )}
 
-                                <div className="flex items-center gap-3 text-xs font-mono">
-                                  {holdDiff !== 0 && (
-                                    <span
-                                      className={`px-2 py-0.5 rounded font-bold ${
-                                        holdDiff > 0
-                                          ? 'bg-rose-500/20 text-rose-300'
-                                          : 'bg-emerald-500/20 text-emerald-300'
-                                      }`}
-                                    >
-                                      Hold Days: {holdDiff > 0 ? `+${holdDiff}` : holdDiff}
-                                    </span>
-                                  )}
-                                  {costDiff !== 0 && (
-                                    <span
-                                      className={`font-bold ${
-                                        costDiff > 0 ? 'text-rose-400' : 'text-emerald-400'
-                                      }`}
-                                    >
-                                      {costDiff > 0 ? `+$${costDiff.toLocaleString()}` : `-$${Math.abs(costDiff).toLocaleString()}`}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Work Day Schedule Change Details */}
-                              <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-800/60 font-mono">
-                                <div>
-                                  <span className="text-slate-400 text-[10px] block">Base Work Days:</span>
-                                  <span className="text-slate-200">
-                                    {ac.work_days_before.length > 0
-                                      ? ac.work_days_before.map((d) => `Day ${d}`).join(', ')
-                                      : 'None'}
+                              {lb.removed_off_days.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] font-bold text-emerald-300">
+                                    - Permit Cleared (Filming Permitted):
                                   </span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 text-[10px] block">New Work Days:</span>
-                                  <span className="text-purple-300 font-bold">
-                                    {ac.work_days_after.length > 0
-                                      ? ac.work_days_after.map((d) => `Day ${d}`).join(', ')
-                                      : 'None'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Day-by-Day Cell Code Diff */}
-                              {Object.keys(ac.status_changes).length > 0 && (
-                                <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px]">
-                                  <span className="text-slate-400">Status shifts:</span>
-                                  {Object.entries(ac.status_changes).map(([day, codes]) => (
-                                    <span
-                                      key={day}
-                                      className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 font-mono text-slate-300"
-                                    >
-                                      Day {day}: <span className="text-rose-400">{codes.before}</span> ➔{' '}
-                                      <span className="text-emerald-400 font-bold">{codes.after}</span>
-                                    </span>
-                                  ))}
+                                  <div className="flex items-center gap-1">
+                                    {lb.removed_off_days.map((d) => (
+                                      <span
+                                        key={d}
+                                        className="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-emerald-200 font-mono font-bold text-[11px]"
+                                      >
+                                        ✓ Day {d}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
-                          );
-                        })
+                          </div>
+                        ))
                       )}
                     </div>
                   )}
 
-                  {/* TAB 3: LOCATION SHIFTS */}
-                  {activeDiffTab === 'locations' && (
+                  {/* CATEGORY 4: SUDDEN CHAOS & DISRUPTIONS */}
+                  {activeCategory === 'chaos' && (
                     <div className="space-y-2.5">
-                      {diffResult.location_changes.length === 0 ? (
+                      {diffResult.chaos_disruptions_diff.length === 0 ? (
                         <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 text-slate-400 text-xs text-center flex items-center justify-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          <span>No location shoot days changed between these versions.</span>
+                          <span>No sudden emergency disruptions or chaos injections difference between these versions.</span>
                         </div>
                       ) : (
-                        diffResult.location_changes.map((lc) => (
+                        diffResult.chaos_disruptions_diff.map((cd) => (
                           <div
-                            key={lc.location}
-                            className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2 text-xs"
+                            key={cd.alert_id}
+                            className={`p-3.5 rounded-xl border space-y-1.5 ${
+                              cd.change_type === 'added'
+                                ? 'bg-rose-950/30 border-rose-700/60'
+                                : 'bg-slate-950/40 border-slate-800'
+                            }`}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="font-bold text-white flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                                <span>{lc.location}</span>
-                              </span>
-                              <span className="text-slate-400 text-[11px] font-mono">
-                                {lc.scenes_count_after} scenes
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 font-mono text-[11px] pt-1 border-t border-slate-800/60">
-                              <div>
-                                <span className="text-slate-400 text-[10px] block">Base Filming Days:</span>
-                                <span className="text-slate-200">
-                                  {lc.days_before.length > 0
-                                    ? lc.days_before.map((d) => `Day ${d}`).join(', ')
-                                    : 'None'}
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    cd.change_type === 'added'
+                                      ? 'bg-rose-600 text-white'
+                                      : 'bg-slate-800 text-slate-400'
+                                  }`}
+                                >
+                                  {cd.change_type === 'added' ? '+ Chaos Added' : '- Chaos Removed'}
+                                </span>
+                                <span className="font-bold text-xs text-white flex items-center gap-1.5">
+                                  <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                                  <span>{cd.disruption_type}</span>
                                 </span>
                               </div>
-                              <div>
-                                <span className="text-slate-400 text-[10px] block">New Filming Days:</span>
-                                <span className="text-purple-300 font-bold">
-                                  {lc.days_after.length > 0
-                                    ? lc.days_after.map((d) => `Day ${d}`).join(', ')
-                                    : 'None'}
-                                </span>
-                              </div>
+                              <span className="text-[11px] font-mono text-amber-300">
+                                Affected: {cd.affected_days.map((d) => `Day ${d}`).join(', ')}
+                              </span>
                             </div>
+                            <p className="text-xs text-slate-300">{cd.reason}</p>
                           </div>
                         ))
                       )}
@@ -778,7 +786,7 @@ export const VersionModal: React.FC<VersionModalProps> = ({
           <div className="flex items-center gap-2">
             <Info className="w-3.5 h-3.5 text-purple-400" />
             <span>
-              All version snapshots are stored with complete actor contracts, location permits, scene locks, and CP-SAT solver results.
+              This diff captures user-modified hard constraints only (preplanned dark days, actor/location blackouts, and throw chaos disruptions).
             </span>
           </div>
           <button
