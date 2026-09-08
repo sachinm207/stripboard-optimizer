@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Clapperboard,
@@ -72,16 +72,19 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  const prevIsOpenRef = useRef(false);
+
   // Sync existing board data whenever modal is opened
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       // 1. Resolve scenes: Prioritize scenes list, merge/fallback to scenes currently scheduled on board days
       const boardScenesMap = new Map<string, Scene>();
       if (days && days.length > 0) {
         for (const d of days) {
-          for (const sc of d.scenes) {
+          for (const sc of (d.scenes || [])) {
             boardScenesMap.set(sc.scene_id, {
               ...sc,
+              cast_ids: sc.cast_ids || [],
               locked_day: sc.locked_day || null,
             });
           }
@@ -92,7 +95,11 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
       if (initialScenes && initialScenes.length > 0) {
         mergedScenes = initialScenes.map((sc) => {
           const boardSc = boardScenesMap.get(sc.scene_id);
-          return boardSc ? { ...sc, locked_day: boardSc.locked_day ?? sc.locked_day } : sc;
+          return {
+            ...sc,
+            cast_ids: sc.cast_ids || boardSc?.cast_ids || [],
+            locked_day: boardSc?.locked_day ?? sc.locked_day ?? null,
+          };
         });
       } else {
         mergedScenes = Array.from(boardScenesMap.values());
@@ -103,7 +110,9 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
       if (mergedScenes.length === 0) {
         fetchScenes()
           .then((scs) => {
-            if (scs && scs.length > 0) setScenes(scs);
+            if (scs && scs.length > 0) {
+              setScenes(scs.map((s) => ({ ...s, cast_ids: s.cast_ids || [] })));
+            }
           })
           .catch(() => null);
       }
@@ -119,7 +128,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
           character_name: row.character_name,
           daily_rate: 2500,
           hold_rate: 2000,
-          blackout_days: actorBlackouts[row.actor_id] || [],
+          blackout_days: (actorBlackouts || {})[row.actor_id] || [],
         }));
       }
       setActors(mergedActors);
@@ -154,27 +163,15 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
       setStatusMessage(null);
     }
-  }, [
-    isOpen,
-    initialScenes,
-    initialActors,
-    days,
-    doodMatrix,
-    actorBlackouts,
-    locationBlackouts,
-    darkDays,
-    startDate,
-    wTurnaround,
-    maxMinutesPerDay,
-    permitLeadDays,
-  ]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialScenes, initialActors, days, doodMatrix]);
 
   // Pre-calculate which day each scene is currently scheduled on the active stripboard
   const sceneScheduledDayMap = useMemo(() => {
     const map = new Map<string, DaySchedule>();
     if (days && days.length > 0) {
       for (const d of days) {
-        for (const sc of d.scenes) {
+        for (const sc of (d.scenes || [])) {
           map.set(sc.scene_id, d);
         }
       }
@@ -187,7 +184,8 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
     const map = new Map<string, number[]>();
     if (days && days.length > 0) {
       for (const d of days) {
-        for (const sc of d.scenes) {
+        for (const sc of (d.scenes || [])) {
+          if (!sc.location) continue;
           const list = map.get(sc.location) || [];
           if (!list.includes(d.day_number)) {
             list.push(d.day_number);
@@ -210,15 +208,14 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
     return map;
   }, [doodMatrix]);
 
-  if (!isOpen) return null;
-
-  const totalDays = Math.max(numDays, days.length, 5);
-  const allDays = Array.from({ length: totalDays }, (_, i) => i + 1);
   const locations = useMemo(() => {
-    const set = new Set(scenes.map((s) => s.location).filter(Boolean));
-    Object.keys(draftLocationBlackouts).forEach((loc) => set.add(loc));
+    const set = new Set((scenes || []).map((s) => s.location).filter(Boolean));
+    Object.keys(draftLocationBlackouts || {}).forEach((loc) => set.add(loc));
     return Array.from(set).sort();
   }, [scenes, draftLocationBlackouts]);
+
+  const totalDays = Math.max(numDays || 5, (days || []).length, 5);
+  const allDays = Array.from({ length: totalDays }, (_, i) => i + 1);
 
   // Scene editing helpers
   const handleUpdateScene = (idx: number, field: keyof Scene, value: any) => {
@@ -251,9 +248,11 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
   const handleToggleSceneCast = (sceneIdx: number, actorId: string) => {
     const sc = scenes[sceneIdx];
-    const cast = sc.cast_ids.includes(actorId)
-      ? sc.cast_ids.filter((id) => id !== actorId)
-      : [...sc.cast_ids, actorId];
+    if (!sc) return;
+    const currentCast = sc.cast_ids || [];
+    const cast = currentCast.includes(actorId)
+      ? currentCast.filter((id) => id !== actorId)
+      : [...currentCast, actorId];
     handleUpdateScene(sceneIdx, 'cast_ids', cast);
   };
 
@@ -342,6 +341,8 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
@@ -567,7 +568,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                       <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-900 text-xs">
                         <span className="text-[11px] text-slate-400 mr-1">Cast Required:</span>
                         {actors.map((act) => {
-                          const isCast = sc.cast_ids.includes(act.actor_id);
+                          const isCast = (sc.cast_ids || []).includes(act.actor_id);
                           return (
                             <button
                               key={act.actor_id}
@@ -615,7 +616,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                 {actors.map((act) => {
-                  const blackouts = draftActorBlackouts[act.actor_id] || [];
+                  const blackouts = (draftActorBlackouts && draftActorBlackouts[act.actor_id]) || [];
                   const dood = actorDoodMap.get(act.actor_id);
                   return (
                     <div
@@ -667,7 +668,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                             </div>
                             {dood && (
                               <span className="text-emerald-400 text-[10px] hidden sm:inline ml-1">
-                                (Board: {dood.work_days}W / {dood.hold_days}H = ${dood.talent_cost.toLocaleString()})
+                                (Board: {dood.work_days}W / {dood.hold_days}H = ${(dood.talent_cost ?? 0).toLocaleString()})
                               </span>
                             )}
                           </div>
@@ -768,7 +769,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                 {locations.map((loc) => {
-                  const blackouts = draftLocationBlackouts[loc] || [];
+                  const blackouts = (draftLocationBlackouts && draftLocationBlackouts[loc]) || [];
                   const locScenes = scenes.filter((s) => s.location === loc);
                   const activeDays = locationActiveDaysMap.get(loc) || [];
                   return (
@@ -878,7 +879,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                       SAG-AFTRA Turnaround Penalty
                     </span>
                     <span className="text-amber-400 font-mono font-bold text-xs">
-                      ${draftTurnaround.toLocaleString()} / violation
+                      ${(draftTurnaround || 25000).toLocaleString()} / violation
                     </span>
                   </label>
                   <p className="text-[11px] text-slate-400">
