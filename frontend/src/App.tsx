@@ -142,10 +142,9 @@ export const App: React.FC = () => {
       ]);
       setKafkaStatus(kStat);
       setUnionAudit(uAudit);
-      setIsChaosOpen(false);
       setError(null);
     } catch (err: any) {
-      setError('Error solving schedule with disruption: ' + err.message);
+      setError('Error adding disruption: ' + err.message);
     } finally {
       setIsSolving(false);
     }

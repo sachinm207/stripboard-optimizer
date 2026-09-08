@@ -36,7 +36,6 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
   const [disruptionType, setDisruptionType] = useState('ACTOR_ILLNESS');
   const [selectedDays, setSelectedDays] = useState<number[]>([2]);
   const [reason, setReason] = useState('Emergency medical isolation (48h)');
-  const [stagedAlerts, setStagedAlerts] = useState<DisruptionAlert[]>([]);
   const [shutdownDay, setShutdownDay] = useState<number>(3);
   const [shutdownReason, setShutdownReason] = useState<string>('Emergency Force Majeure: Citywide flash flood warning and municipal curfew');
 
@@ -55,34 +54,12 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
     reason: reason || 'Production disruption incident',
   });
 
-  const handleInjectCustom = (e: React.FormEvent) => {
+  const handleAddCustomDisruption = (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedDays.length === 0) return;
     const alert = createAlertObject();
-    if (stagedAlerts.length > 0 && onInjectBatch) {
-      onInjectBatch([...stagedAlerts, alert]);
-      setStagedAlerts([]);
-    } else {
-      onInject(alert);
-    }
-  };
-
-  const handleStageDisruption = () => {
-    const alert = createAlertObject();
-    setStagedAlerts([...stagedAlerts, alert]);
-  };
-
-  const handleRemoveStaged = (idx: number) => {
-    setStagedAlerts(stagedAlerts.filter((_, i) => i !== idx));
-  };
-
-  const handleTriggerBatch = () => {
-    if (stagedAlerts.length === 0) return;
-    if (onInjectBatch) {
-      onInjectBatch(stagedAlerts);
-    } else {
-      stagedAlerts.forEach((a) => onInject(a));
-    }
-    setStagedAlerts([]);
+    onInject(alert);
+    setReason('');
   };
 
   const handleToggleDay = (d: number) => {
@@ -217,7 +194,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             >
               <Moon className="w-4 h-4" />
               <span>
-                {isSolving ? 'Evacuating Day...' : `🚨 Evacuate Day ${shutdownDay} & Reschedule Production`}
+                {isSolving ? 'Evacuating Day...' : `🚨 Evacuate & Shutdown Day ${shutdownDay}`}
               </span>
             </button>
           </div>
@@ -267,7 +244,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             <Zap className="w-3.5 h-3.5 text-amber-400" />
             Custom Disruption Injection
           </h4>
-          <form onSubmit={handleInjectCustom} className="space-y-3.5">
+          <form onSubmit={handleAddCustomDisruption} className="space-y-3.5">
             <div>
               <label className="block text-[11px] text-slate-400 font-medium mb-1">Disruption Type</label>
               <select
@@ -422,74 +399,17 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
               />
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleStageDisruption}
-                disabled={selectedDays.length === 0}
-                className="flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
-                title="Queue this disruption to trigger alongside other disruptions"
-              >
-                <Plus className="w-3.5 h-3.5 text-amber-400" />
-                <span>Stage in Batch</span>
-              </button>
-
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={isSolving || selectedDays.length === 0}
-                className="flex-1 py-2 px-3 rounded-lg bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-bold shadow-lg shadow-rose-900/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 disabled:opacity-50 text-slate-950 font-black text-xs transition-all shadow-md shadow-rose-900/20 flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Flame className="w-3.5 h-3.5" />
-                <span>{isSolving ? 'Registering...' : 'Inject Disruption'}</span>
+                <Plus className="w-4 h-4" />
+                <span>{isSolving ? 'Adding Disruption...' : '+ Add Disruption'}</span>
               </button>
             </div>
           </form>
-
-          {/* Staged Disruptions Queue */}
-          {stagedAlerts.length > 0 && (
-            <div className="mt-4 p-3 bg-slate-950/80 border border-amber-500/40 rounded-xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5" />
-                  Staged Disruptions Batch ({stagedAlerts.length})
-                </span>
-                <button
-                  onClick={() => setStagedAlerts([])}
-                  className="text-[10px] text-slate-400 hover:text-rose-400 cursor-pointer"
-                >
-                  Clear
-                </button>
-              </div>
-
-              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                {stagedAlerts.map((a, i) => (
-                  <div key={i} className="flex items-center justify-between p-2 rounded bg-slate-900 border border-slate-800 text-[11px]">
-                    <div className="truncate pr-2">
-                      <div className="font-semibold text-white truncate">{a.reason}</div>
-                      <div className="text-slate-400 text-[10px]">
-                        Days: {a.affected_shoot_days.map(d => `D${d}`).join(', ')} | {a.affected_actor_id || a.affected_location}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleRemoveStaged(i)}
-                      className="text-slate-500 hover:text-rose-400 shrink-0 p-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={handleTriggerBatch}
-                disabled={isSolving}
-                className="w-full py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Flame className="w-3.5 h-3.5" />
-                <span>Register All {stagedAlerts.length} Staged Disruptions</span>
-              </button>
-            </div>
-          )}
 
           {/* Direct Optimize Schedule Shortcut */}
           {onSolve && (
