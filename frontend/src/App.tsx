@@ -8,6 +8,7 @@ import { ProducerMemoModal } from './components/ProducerMemoModal';
 import { ImportModal } from './components/ImportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { VersionModal } from './components/VersionModal';
+import { PlanEditorModal } from './components/PlanEditorModal';
 import {
   fetchSchedule,
   fetchScenes,
@@ -59,6 +60,7 @@ export const App: React.FC = () => {
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPlanEditorOpen, setIsPlanEditorOpen] = useState(false);
   const [isGeneratingGemini, setIsGeneratingGemini] = useState(false);
   const [activeTab, setActiveTab] = useState<'stripboard' | 'dood' | 'union' | 'kafka'>('stripboard');
   const [isSolving, setIsSolving] = useState(false);
@@ -435,6 +437,7 @@ export const App: React.FC = () => {
         hasProduction={Boolean(solution && solution.days && solution.days.length > 0)}
         onOpenChaos={() => setIsChaosOpen(true)}
         onOpenMemo={() => setIsMemoOpen(true)}
+        onOpenPlanEditor={() => setIsPlanEditorOpen(true)}
         onOpenVersions={() => setIsVersionsOpen(true)}
         onOpenImport={() => setIsImportOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -936,6 +939,26 @@ export const App: React.FC = () => {
         onClose={() => setIsSettingsOpen(false)}
         onSaved={(updatedSol) => {
           setSolution(updatedSol);
+          fetchUnionAudit().then(setUnionAudit).catch(() => null);
+        }}
+        isSaving={isSolving}
+      />
+
+      {/* Official Production Plan Editor Modal */}
+      <PlanEditorModal
+        isOpen={isPlanEditorOpen}
+        onClose={() => setIsPlanEditorOpen(false)}
+        scenes={scenes}
+        actors={actors}
+        days={solution?.days || []}
+        numDays={solution?.days?.length || 5}
+        actorBlackouts={solution?.actor_blackouts || {}}
+        locationBlackouts={solution?.location_blackouts || {}}
+        darkDays={solution?.dark_days || []}
+        startDate={solution?.days?.[0]?.calendar_date || '2026-10-12'}
+        onPlanSaved={(updatedSol) => {
+          setSolution(updatedSol);
+          loadData();
           fetchUnionAudit().then(setUnionAudit).catch(() => null);
         }}
         isSaving={isSolving}

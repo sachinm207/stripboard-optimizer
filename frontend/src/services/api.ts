@@ -206,6 +206,26 @@ export async function updateConstraints(constraints: {
   return res.json();
 }
 
+export async function updateProductionPlan(plan: {
+  scenes?: Scene[];
+  actors?: Actor[];
+  actor_blackouts?: Record<string, number[]>;
+  location_blackouts?: Record<string, number[]>;
+  dark_days?: number[];
+  start_date?: string;
+  w_turnaround?: number;
+  max_minutes_per_day?: number;
+  permit_lead_days?: number;
+}): Promise<ScheduleSolution> {
+  const res = await fetch(`${API_BASE}/production/plan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(plan),
+  });
+  if (!res.ok) throw new Error('Failed to update production plan');
+  return res.json();
+}
+
 export async function toggleSoftLock(
   entityId: string,
   day: number,

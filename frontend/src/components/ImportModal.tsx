@@ -194,9 +194,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               <Upload className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white">Import Film Production Breakdown</h3>
+              <h3 className="font-bold text-base text-white">Create New Film Board / Import Breakdown</h3>
               <p className="text-xs text-slate-400">
-                Upload CSV breakdown or JSON specification to run the stripboard optimizer
+                Upload screenplay CSV breakdown or JSON specification to initialize a full production workspace
               </p>
             </div>
           </div>

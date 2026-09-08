@@ -627,6 +627,82 @@ async def update_production_constraints(req: UpdateConstraintsRequest):
         return STATE["current_solution"]
     raise HTTPException(status_code=400, detail="No active schedule loaded.")
 
+class UpdatePlanRequest(BaseModel):
+    scenes: Optional[List[Scene]] = None
+    actors: Optional[List[Actor]] = None
+    actor_blackouts: Optional[Dict[str, List[int]]] = None
+    location_blackouts: Optional[Dict[str, List[int]]] = None
+    dark_days: Optional[List[int]] = None
+    start_date: Optional[str] = None
+    w_turnaround: Optional[int] = None
+    max_minutes_per_day: Optional[int] = None
+    permit_lead_days: Optional[int] = None
+
+@app.post("/api/production/plan", response_model=ScheduleSolution)
+async def update_production_plan(req: UpdatePlanRequest):
+    if req.scenes is not None:
+        STATE["scenes"] = req.scenes
+    if req.actors is not None:
+        STATE["actors"] = req.actors
+    if req.actor_blackouts is not None:
+        STATE["actor_blackouts"] = req.actor_blackouts
+    if req.location_blackouts is not None:
+        STATE["location_blackouts"] = req.location_blackouts
+    if req.dark_days is not None:
+        STATE["dark_days"] = req.dark_days
+
+    ps = STATE.setdefault("production_settings", ProductionSettings())
+    if req.start_date is not None:
+        ps.start_date = req.start_date
+        STATE["start_date"] = req.start_date
+    if req.w_turnaround is not None:
+        ps.w_turnaround = req.w_turnaround
+    if req.max_minutes_per_day is not None:
+        ps.max_minutes_per_day = req.max_minutes_per_day
+    if req.permit_lead_days is not None:
+        ps.permit_lead_days = req.permit_lead_days
+
+    if STATE.get("current_solution"):
+        sol = STATE["current_solution"]
+        sol.actor_blackouts = STATE.get("actor_blackouts", {})
+        sol.location_blackouts = STATE.get("location_blackouts", {})
+        sol.dark_days = list(STATE.get("dark_days", []))
+
+        if req.scenes:
+            scene_lookup = {s.scene_id: s for s in req.scenes}
+            for d in sol.days:
+                updated_scenes = []
+                for sc in d.scenes:
+                    if sc.scene_id in scene_lookup:
+                        updated_scenes.append(scene_lookup[sc.scene_id])
+                    else:
+                        updated_scenes.append(sc)
+                d.scenes = updated_scenes
+                d.total_duration_minutes = sum(s.est_shoot_minutes for s in d.scenes)
+
+        for d in sol.days:
+            if d.day_number in STATE["dark_days"]:
+                d.is_dark_day = True
+                if not d.dark_day_reason:
+                    d.dark_day_reason = "Pre-planned Hiatus / Dark Day"
+            elif not any(a.disruption_type == "DAY_SHUTDOWN" and d.day_number in a.affected_shoot_days for a in STATE.get("active_disruptions", [])):
+                d.is_dark_day = False
+                d.dark_day_reason = None
+            if ps.start_date:
+                cal_date, disp_date = get_day_dates(ps.start_date, d.day_number)
+                d.calendar_date = cal_date
+                d.date_display = disp_date
+
+        sol.status = "PENDING_OPTIMIZATION"
+        await event_bus.publish("schedule.optimized.solution", sol.model_dump())
+        if req.scenes:
+            await event_bus.publish("production.scene.catalog", [s.model_dump() for s in req.scenes])
+        if req.actors:
+            await event_bus.publish("production.cast.roster", [a.model_dump() for a in req.actors])
+        return sol
+
+    raise HTTPException(status_code=400, detail="No active schedule loaded.")
+
 class ToggleSoftLockRequest(BaseModel):
     entity_id: str
     day: int
