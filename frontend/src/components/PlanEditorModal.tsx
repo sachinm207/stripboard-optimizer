@@ -57,7 +57,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
   onPlanSaved,
   isSaving = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<'scenes' | 'cast' | 'locations' | 'calendar'>('scenes');
+  const [activeTab, setActiveTab] = useState<'cast' | 'locations' | 'calendar'>('cast');
 
   // Working drafts
   const [scenes, setScenes] = useState<Scene[]>([]);
@@ -213,19 +213,6 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
     prevIsOpenRef.current = isOpen;
   }, [isOpen, initialScenes, initialActors, days, doodMatrix]);
 
-  // Pre-calculate which day each scene is currently scheduled on the active stripboard
-  const sceneScheduledDayMap = useMemo(() => {
-    const map = new Map<string, DaySchedule>();
-    if (days && days.length > 0) {
-      for (const d of days) {
-        for (const sc of (d.scenes || [])) {
-          map.set(sc.scene_id, d);
-        }
-      }
-    }
-    return map;
-  }, [days]);
-
   // Pre-calculate which days each location is currently active on the board
   const locationActiveDaysMap = useMemo(() => {
     const map = new Map<string, number[]>();
@@ -276,45 +263,6 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
     } catch {
       return '';
     }
-  };
-
-  // Scene editing helpers
-  const handleUpdateScene = (idx: number, field: keyof Scene, value: any) => {
-    const updated = [...scenes];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setScenes(updated);
-  };
-
-  const handleDeleteScene = (idx: number) => {
-    const updated = scenes.filter((_, i) => i !== idx);
-    setScenes(updated);
-  };
-
-  const handleAddScene = () => {
-    const nextNum = scenes.length > 0 ? (Math.max(...scenes.map((s) => parseInt(s.scene_number) || 0)) + 1).toString() : '1';
-    const newSc: Scene = {
-      scene_id: `SC_${nextNum.padStart(2, '0')}`,
-      scene_number: nextNum,
-      slugline: `INT. NEW STAGE - DAY`,
-      setting: 'INT_DAY' as any,
-      location: locations[0] || 'Studio Soundstage',
-      pages_eighths: 8,
-      est_shoot_minutes: 120,
-      cast_ids: actors.length > 0 ? [actors[0].actor_id] : [],
-      description: 'New script revision scene',
-      locked_day: null,
-    };
-    setScenes([...scenes, newSc]);
-  };
-
-  const handleToggleSceneCast = (sceneIdx: number, actorId: string) => {
-    const sc = scenes[sceneIdx];
-    if (!sc) return;
-    const currentCast = sc.cast_ids || [];
-    const cast = currentCast.includes(actorId)
-      ? currentCast.filter((id) => id !== actorId)
-      : [...currentCast, actorId];
-    handleUpdateScene(sceneIdx, 'cast_ids', cast);
   };
 
   // Actor editing helpers
@@ -477,18 +425,6 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
         {/* Navigation Tabs */}
         <div className="flex border-b border-slate-800 bg-slate-950 px-6 pt-2 shrink-0 gap-2 overflow-x-auto">
           <button
-            onClick={() => setActiveTab('scenes')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-              activeTab === 'scenes'
-                ? 'border-indigo-500 text-indigo-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Clapperboard className="w-3.5 h-3.5" />
-            <span>Scenes & Script ({scenes.length})</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('cast')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
               activeTab === 'cast'
@@ -534,236 +470,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
             </div>
           )}
 
-          {/* TAB 1: SCENES & SCRIPT BREAKDOWN */}
-          {activeTab === 'scenes' && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Shooting Script Scenes</h4>
-                  <p className="text-[11px] text-slate-400">
-                    Existing scenes from current stripboard. Modify durations, lighting, cast calls, or lock scenes to fixed shoot days. To let the optimizer place scenes freely, leave them as <span className="text-slate-200 font-semibold">"Flexible (Auto-Schedule)"</span>.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-xs text-slate-400 font-mono">
-                    Total Duration:{' '}
-                    <span className="text-amber-400 font-bold">
-                      {Math.round(scenes.reduce((acc, s) => acc + s.est_shoot_minutes, 0) / 60)} hrs
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddScene}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 text-xs font-bold transition-all cursor-pointer shadow-sm"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-indigo-300" />
-                    <span>+ Add Scene</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                {scenes.map((sc, idx) => {
-                  const scheduledDay = sceneScheduledDayMap.get(sc.scene_id);
-                  const isScheduledOnDark = scheduledDay && draftDarkDays.includes(scheduledDay.day_number);
-                  const talentBlackoutConflicts = scheduledDay
-                    ? (sc.cast_ids || [])
-                        .filter((actId) => ((draftActorBlackouts[actId] || []).includes(scheduledDay.day_number)))
-                        .map((actId) => actors.find((a) => a.actor_id === actId)?.name || actId)
-                    : [];
-                  const isLocationBlackoutConflict = scheduledDay
-                    ? (draftLocationBlackouts[sc.location] || []).includes(scheduledDay.day_number)
-                    : false;
-
-                  return (
-                    <div
-                      key={sc.scene_id}
-                      className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition-all space-y-3"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono font-bold text-xs">
-                            Scene {sc.scene_number}
-                          </span>
-                          <input
-                            type="text"
-                            value={sc.slugline}
-                            onChange={(e) => handleUpdateScene(idx, 'slugline', e.target.value)}
-                            className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white font-semibold focus:outline-none focus:border-indigo-500 min-w-[280px]"
-                          />
-                          {/* Live Scheduled Day Tag & Conflict Badges */}
-                          {isScheduledOnDark ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 border border-rose-500/40 text-rose-300 flex items-center gap-1">
-                              <Moon className="w-3 h-3 text-rose-400" />
-                              <span>⛔ Scheduled on Dark Day {scheduledDay.day_number} (Hiatus)</span>
-                            </span>
-                          ) : scheduledDay ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                              <span>Board: Day {scheduledDay.day_number} ({getFormattedDate(draftStartDate, scheduledDay.day_number)})</span>
-                            </span>
-                          ) : null}
-
-                          {talentBlackoutConflicts.length > 0 && (
-                            <span
-                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center gap-1"
-                              title={`Talent blackout: ${talentBlackoutConflicts.join(', ')} cannot film on Day ${scheduledDay?.day_number}`}
-                            >
-                              <AlertCircle className="w-3 h-3 text-amber-400" />
-                              <span>Cast Blackout: {talentBlackoutConflicts.join(', ')}</span>
-                            </span>
-                          )}
-
-                          {isLocationBlackoutConflict && (
-                            <span
-                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 border border-sky-500/40 text-sky-300 flex items-center gap-1"
-                              title={`Location permit blackout: ${sc.location} unavailable on Day ${scheduledDay?.day_number}`}
-                            >
-                              <MapPin className="w-3 h-3 text-sky-400" />
-                              <span>Permit Blackout: {sc.location}</span>
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs">
-                          {/* Setting Pill */}
-                          <select
-                            value={sc.setting}
-                            onChange={(e) => handleUpdateScene(idx, 'setting', e.target.value)}
-                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm"
-                            style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}
-                          >
-                            <option value="INT_DAY" className="bg-slate-900 text-slate-100" style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}>INT DAY</option>
-                            <option value="EXT_DAY" className="bg-slate-900 text-slate-100" style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}>EXT DAY</option>
-                            <option value="INT_NIGHT" className="bg-slate-900 text-slate-100" style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}>INT NIGHT</option>
-                            <option value="EXT_NIGHT" className="bg-slate-900 text-slate-100" style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}>EXT NIGHT</option>
-                          </select>
-
-                          {/* Location */}
-                          <input
-                            type="text"
-                            value={sc.location}
-                            onChange={(e) => handleUpdateScene(idx, 'location', e.target.value)}
-                            placeholder="Location"
-                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 w-36"
-                          />
-
-                          {/* Est Minutes */}
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-500" />
-                            <input
-                              type="number"
-                              min={15}
-                              step={15}
-                              value={sc.est_shoot_minutes}
-                              onChange={(e) => handleUpdateScene(idx, 'est_shoot_minutes', Number(e.target.value))}
-                              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:border-indigo-500 w-16"
-                            />
-                            <span className="text-[10px] text-slate-500">min</span>
-                          </div>
-
-                          {/* Hard Pin to Day Lock */}
-                          <div
-                            className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 shadow-sm"
-                            title={
-                              sc.locked_day
-                                ? `Day ${sc.locked_day} is hard-locked: The CP-SAT solver is forced to schedule this scene on Day ${sc.locked_day}. Change to 'Flexible' to unlock.`
-                                : "Flexible: The solver will automatically place this scene on the optimal day. Select a day to hard-lock it."
-                            }
-                          >
-                            {sc.locked_day ? (
-                              <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            ) : (
-                              <Unlock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            )}
-                            <select
-                              value={sc.locked_day || ''}
-                              onChange={(e) =>
-                                handleUpdateScene(idx, 'locked_day', e.target.value ? Number(e.target.value) : null)
-                              }
-                              className="bg-slate-900 text-xs font-semibold focus:outline-none cursor-pointer border-none py-0.5"
-                              style={{
-                                backgroundColor: '#0f172a',
-                                color: sc.locked_day ? '#fcd34d' : '#f1f5f9',
-                              }}
-                            >
-                              <option
-                                value=""
-                                className="bg-slate-900 text-slate-200 font-normal"
-                                style={{ backgroundColor: '#0f172a', color: '#cbd5e1' }}
-                              >
-                                Flexible (Auto-Schedule)
-                              </option>
-                              {allDays.map((d) => {
-                                const isDark = draftDarkDays.includes(d);
-                                const dDate = getFormattedDate(draftStartDate, d);
-                                return (
-                                  <option
-                                    key={d}
-                                    value={d}
-                                    disabled={isDark}
-                                    className={isDark ? "bg-slate-950 text-slate-500 italic" : "bg-slate-900 text-slate-100 font-medium"}
-                                    style={{
-                                      backgroundColor: isDark ? '#020617' : '#0f172a',
-                                      color: isDark ? '#64748b' : '#f8fafc',
-                                    }}
-                                  >
-                                    Lock Day {d}{dDate ? ` (${dDate})` : ''}{isDark ? ' — ⛔ DARK DAY (Hiatus)' : ''}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </div>
-
-                          {/* Delete Scene Button */}
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteScene(idx)}
-                            className="p-1 rounded bg-slate-900 border border-slate-700 text-slate-500 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-950/30 transition-all cursor-pointer ml-0.5"
-                            title="Delete Scene from Script"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Cast required chips */}
-                      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-900 text-xs">
-                        <span className="text-[11px] text-slate-400 mr-1">Cast Required:</span>
-                        {actors.map((act) => {
-                          const isCast = (sc.cast_ids || []).includes(act.actor_id);
-                          const isConflictOnDay = isCast && scheduledDay && (draftActorBlackouts[act.actor_id] || []).includes(scheduledDay.day_number);
-                          return (
-                            <button
-                              key={act.actor_id}
-                              type="button"
-                              onClick={() => handleToggleSceneCast(idx, act.actor_id)}
-                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                                isConflictOnDay
-                                  ? 'bg-rose-950/80 border border-rose-500 text-rose-300 font-bold'
-                                  : isCast
-                                  ? 'bg-purple-600/30 border border-purple-500/50 text-purple-300'
-                                  : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-slate-300'
-                              }`}
-                              title={
-                                isConflictOnDay
-                                  ? `⚠️ ${act.name} has a contractual blackout on Day ${scheduledDay.day_number}!`
-                                  : act.name
-                              }
-                            >
-                              {act.name} {isConflictOnDay && '⚠️'}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: CAST & CONTRACT BLACKOUTS */}
+          {/* TAB: CAST & CONTRACT BLACKOUTS */}
           {activeTab === 'cast' && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
