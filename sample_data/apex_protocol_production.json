@@ -1,0 +1,230 @@
+{
+  "production_id": "prod_apex_protocol",
+  "title": "Apex Protocol",
+  "num_days": 5,
+  "max_minutes_per_day": 600,
+  "actors": [
+    {
+      "actor_id": "ACTOR_RACHEL",
+      "name": "Rachel Cruz",
+      "character_name": "Agent Rachel Cruz",
+      "cast_number": 1,
+      "daily_rate": 6500,
+      "hold_rate": 3000,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_VANCE",
+      "name": "Victor Vance",
+      "character_name": "Victor Vance (The Broker)",
+      "cast_number": 2,
+      "daily_rate": 5000,
+      "hold_rate": 2200,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [3],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_MARCUS",
+      "name": "Marcus Sterling",
+      "character_name": "Det. Marcus Sterling",
+      "cast_number": 3,
+      "daily_rate": 4500,
+      "hold_rate": 2000,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_ELENA",
+      "name": "Elena Rostova",
+      "character_name": "Dr. Elena Rostova",
+      "cast_number": 4,
+      "daily_rate": 3800,
+      "hold_rate": 1600,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    },
+    {
+      "actor_id": "ACTOR_LEO",
+      "name": "Leo Santos",
+      "character_name": "Mercenary Santos",
+      "cast_number": 5,
+      "daily_rate": 2800,
+      "hold_rate": 1200,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [],
+      "is_principal": false
+    }
+  ],
+  "scenes": [
+    {
+      "scene_id": "SC_01",
+      "scene_number": "1",
+      "slugline": "EXT. HARBOR DOCKS - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Harbor Docks",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 180,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_VANCE"],
+      "description": "Rachel intercepts the encrypted shipping manifest from Vance."
+    },
+    {
+      "scene_id": "SC_02",
+      "scene_number": "2",
+      "slugline": "INT. DRY DOCK WAREHOUSE - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Harbor Docks",
+      "pages_eighths": 22,
+      "est_shoot_minutes": 210,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_VANCE", "ACTOR_LEO"],
+      "description": "Ambush by syndicate mercenaries inside the container bay."
+    },
+    {
+      "scene_id": "SC_03",
+      "scene_number": "3",
+      "slugline": "EXT. CONTAINER CRANE PLATFORM - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Harbor Docks",
+      "pages_eighths": 12,
+      "est_shoot_minutes": 130,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_LEO"],
+      "description": "Rooftop sniper shootout and cable escape."
+    },
+    {
+      "scene_id": "SC_04",
+      "scene_number": "4",
+      "slugline": "INT. EMBASSY DIPLOMATIC VAULT - DAY",
+      "setting": "INT_DAY",
+      "location": "Swiss Embassy",
+      "pages_eighths": 20,
+      "est_shoot_minutes": 190,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_MARCUS"],
+      "description": "Safe cracking and retrieval of the biometric cipher key."
+    },
+    {
+      "scene_id": "SC_05",
+      "scene_number": "5",
+      "slugline": "INT. EMBASSY GRAND BALLROOM - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Swiss Embassy",
+      "pages_eighths": 28,
+      "est_shoot_minutes": 240,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_MARCUS", "ACTOR_VANCE"],
+      "description": "Covert dance floor interrogation amidst the high-society gala."
+    },
+    {
+      "scene_id": "SC_06",
+      "scene_number": "6",
+      "slugline": "EXT. EMBASSY GARDENS - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Swiss Embassy",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 140,
+      "cast_ids": ["ACTOR_MARCUS", "ACTOR_VANCE"],
+      "description": "Tense standoff at the marble fountain during fireworks."
+    },
+    {
+      "scene_id": "SC_07",
+      "scene_number": "7",
+      "slugline": "INT. UNDERGROUND SAFE HOUSE - DAY",
+      "setting": "INT_DAY",
+      "location": "Safe House",
+      "pages_eighths": 24,
+      "est_shoot_minutes": 220,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_ELENA"],
+      "description": "Elena treats Rachel's shrapnel wound and decrypts the flash drive."
+    },
+    {
+      "scene_id": "SC_08",
+      "scene_number": "8",
+      "slugline": "INT. SAFE HOUSE SERVER ROOM - DAY",
+      "setting": "INT_DAY",
+      "location": "Safe House",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 160,
+      "cast_ids": ["ACTOR_ELENA", "ACTOR_MARCUS"],
+      "description": "System breach detection and panic room lockdown sequence."
+    },
+    {
+      "scene_id": "SC_09",
+      "scene_number": "9",
+      "slugline": "EXT. SAFE HOUSE ALLEYWAY - DAY",
+      "setting": "EXT_DAY",
+      "location": "Safe House",
+      "pages_eighths": 10,
+      "est_shoot_minutes": 110,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_ELENA"],
+      "description": "Evacuation to armored decoy van under smoke cover."
+    },
+    {
+      "scene_id": "SC_10",
+      "scene_number": "10",
+      "slugline": "EXT. MOUNTAIN RIDGE HIGHWAY - DAY",
+      "setting": "EXT_DAY",
+      "location": "Mountain Pass",
+      "pages_eighths": 26,
+      "est_shoot_minutes": 240,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_LEO"],
+      "description": "High-speed convoy pursuit and collision near the canyon drop."
+    },
+    {
+      "scene_id": "SC_11",
+      "scene_number": "11",
+      "slugline": "EXT. OVERLOOK CLIFF - DAY",
+      "setting": "EXT_DAY",
+      "location": "Mountain Pass",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 150,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_LEO", "ACTOR_VANCE"],
+      "description": "Final hand-to-hand confrontation on the precipice."
+    },
+    {
+      "scene_id": "SC_12",
+      "scene_number": "12",
+      "slugline": "INT. ABANDONED OBSERVATORY - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Mountain Pass",
+      "pages_eighths": 18,
+      "est_shoot_minutes": 170,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_VANCE"],
+      "description": "The syndicate transmitter broadcast override."
+    },
+    {
+      "scene_id": "SC_13",
+      "scene_number": "13",
+      "slugline": "INT. POLICE HEADQUARTERS BRIEFING ROOM - DAY",
+      "setting": "INT_DAY",
+      "location": "Metro Precinct",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 150,
+      "cast_ids": ["ACTOR_MARCUS", "ACTOR_ELENA"],
+      "description": "Post-operation debrief and intelligence handoff to federal agents."
+    },
+    {
+      "scene_id": "SC_14",
+      "scene_number": "14",
+      "slugline": "INT. PRECINCT EVIDENCE ARCHIVE - DAY",
+      "setting": "INT_DAY",
+      "location": "Metro Precinct",
+      "pages_eighths": 12,
+      "est_shoot_minutes": 120,
+      "cast_ids": ["ACTOR_MARCUS", "ACTOR_VANCE"],
+      "description": "Securing the classified drive in the biometric evidence locker."
+    },
+    {
+      "scene_id": "SC_15",
+      "scene_number": "15",
+      "slugline": "EXT. METRO PRECINCT HELIPAD - DAY",
+      "setting": "EXT_DAY",
+      "location": "Metro Precinct",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 130,
+      "cast_ids": ["ACTOR_RACHEL", "ACTOR_MARCUS"],
+      "description": "Helicopter departure into the sunrise."
+    }
+  ]
+}

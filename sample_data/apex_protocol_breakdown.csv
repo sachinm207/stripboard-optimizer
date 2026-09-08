@@ -1,0 +1,16 @@
+scene_number,slugline,setting,location,pages_eighths,est_shoot_minutes,cast_names,description
+1,EXT. HARBOR DOCKS - NIGHT,EXT_NIGHT,Harbor Docks,16,180,"Rachel Cruz, Victor Vance",Rachel intercepts the encrypted shipping manifest from Vance.
+2,INT. DRY DOCK WAREHOUSE - NIGHT,INT_NIGHT,Harbor Docks,22,210,"Rachel Cruz, Victor Vance, Leo Santos",Ambush by syndicate mercenaries inside the container bay.
+3,EXT. CONTAINER CRANE PLATFORM - NIGHT,EXT_NIGHT,Harbor Docks,12,130,"Rachel Cruz, Leo Santos",Rooftop sniper shootout and cable escape.
+4,INT. EMBASSY DIPLOMATIC VAULT - DAY,INT_DAY,Swiss Embassy,20,190,"Rachel Cruz, Marcus Sterling",Safe cracking and retrieval of the biometric cipher key.
+5,INT. EMBASSY GRAND BALLROOM - NIGHT,INT_NIGHT,Swiss Embassy,28,240,"Rachel Cruz, Marcus Sterling, Victor Vance",Covert dance floor interrogation amidst the high-society gala.
+6,EXT. EMBASSY GARDENS - NIGHT,EXT_NIGHT,Swiss Embassy,14,140,"Marcus Sterling, Victor Vance",Tense standoff at the marble fountain during fireworks.
+7,INT. UNDERGROUND SAFE HOUSE - DAY,INT_DAY,Safe House,24,220,"Rachel Cruz, Elena Rostova",Elena treats Rachel's shrapnel wound and decrypts the flash drive.
+8,INT. SAFE HOUSE SERVER ROOM - DAY,INT_DAY,Safe House,16,160,"Elena Rostova, Marcus Sterling",System breach detection and panic room lockdown sequence.
+9,EXT. SAFE HOUSE ALLEYWAY - DAY,EXT_DAY,Safe House,10,110,"Rachel Cruz, Elena Rostova",Evacuation to armored decoy van under smoke cover.
+10,EXT. MOUNTAIN RIDGE HIGHWAY - DAY,EXT_DAY,Mountain Pass,26,240,"Rachel Cruz, Leo Santos",High-speed convoy pursuit and collision near the canyon drop.
+11,EXT. OVERLOOK CLIFF - DAY,EXT_DAY,Mountain Pass,14,150,"Rachel Cruz, Leo Santos, Victor Vance",Final hand-to-hand confrontation on the precipice.
+12,INT. ABANDONED OBSERVATORY - NIGHT,INT_NIGHT,Mountain Pass,18,170,"Rachel Cruz, Victor Vance",The syndicate transmitter broadcast override.
+13,INT. POLICE HEADQUARTERS BRIEFING ROOM - DAY,INT_DAY,Metro Precinct,16,150,"Marcus Sterling, Elena Rostova",Post-operation debrief and intelligence handoff to federal agents.
+14,INT. PRECINCT EVIDENCE ARCHIVE - DAY,INT_DAY,Metro Precinct,12,120,"Marcus Sterling, Victor Vance",Securing the classified drive in the biometric evidence locker.
+15,EXT. METRO PRECINCT HELIPAD - DAY,EXT_DAY,Metro Precinct,14,130,"Rachel Cruz, Marcus Sterling",Helicopter departure into the sunrise.

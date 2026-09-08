@@ -1,0 +1,109 @@
+{
+  "production_id": "prod_the_canvas",
+  "title": "The Canvas",
+  "num_days": 3,
+  "max_minutes_per_day": 540,
+  "actors": [
+    {
+      "actor_id": "ACTOR_MAYA",
+      "name": "Maya Lin",
+      "character_name": "Maya Lin (The Artist)",
+      "cast_number": 1,
+      "daily_rate": 4000,
+      "hold_rate": 1800,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_JULIAN",
+      "name": "Julian Ross",
+      "character_name": "Julian Ross (The Dealer)",
+      "cast_number": 2,
+      "daily_rate": 3500,
+      "hold_rate": 1500,
+      "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
+      "blackout_days": [],
+      "is_principal": true
+    },
+    {
+      "actor_id": "ACTOR_HAYES",
+      "name": "Detective Hayes",
+      "character_name": "Det. Arthur Hayes",
+      "cast_number": 3,
+      "daily_rate": 2500,
+      "hold_rate": 1000,
+      "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
+      "blackout_days": [2],
+      "is_principal": false
+    }
+  ],
+  "scenes": [
+    {
+      "scene_id": "SC_01",
+      "scene_number": "1",
+      "slugline": "INT. ART STUDIO - DAY",
+      "setting": "INT_DAY",
+      "location": "SoHo Loft",
+      "pages_eighths": 16,
+      "est_shoot_minutes": 180,
+      "cast_ids": ["ACTOR_MAYA", "ACTOR_JULIAN"],
+      "description": "Maya finishes the gallery centerpiece under morning skylight."
+    },
+    {
+      "scene_id": "SC_02",
+      "scene_number": "2",
+      "slugline": "INT. ART STUDIO BEDROOM - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "SoHo Loft",
+      "pages_eighths": 12,
+      "est_shoot_minutes": 120,
+      "cast_ids": ["ACTOR_MAYA", "ACTOR_JULIAN"],
+      "description": "Quiet late-night debate regarding the private collector's offer."
+    },
+    {
+      "scene_id": "SC_03",
+      "scene_number": "3",
+      "slugline": "EXT. SOHO ALLEYWAY - DAY",
+      "setting": "EXT_DAY",
+      "location": "SoHo Loft",
+      "pages_eighths": 8,
+      "est_shoot_minutes": 90,
+      "cast_ids": ["ACTOR_JULIAN", "ACTOR_HAYES"],
+      "description": "Hayes warns Julian about the provenance of the stolen canvas."
+    },
+    {
+      "scene_id": "SC_04",
+      "scene_number": "4",
+      "slugline": "INT. BLUE ROOM GALLERY - NIGHT",
+      "setting": "INT_NIGHT",
+      "location": "Art Gallery",
+      "pages_eighths": 24,
+      "est_shoot_minutes": 240,
+      "cast_ids": ["ACTOR_MAYA", "ACTOR_JULIAN", "ACTOR_HAYES"],
+      "description": "The private auction opening and sudden confrontation."
+    },
+    {
+      "scene_id": "SC_05",
+      "scene_number": "5",
+      "slugline": "EXT. GALLERY PATIO - NIGHT",
+      "setting": "EXT_NIGHT",
+      "location": "Art Gallery",
+      "pages_eighths": 14,
+      "est_shoot_minutes": 140,
+      "cast_ids": ["ACTOR_MAYA", "ACTOR_HAYES"],
+      "description": "Hayes offers Maya a path to clear her name."
+    },
+    {
+      "scene_id": "SC_06",
+      "scene_number": "6",
+      "slugline": "EXT. BROOKLYN PROMENADE - DAY",
+      "setting": "EXT_DAY",
+      "location": "East River Waterfront",
+      "pages_eighths": 18,
+      "est_shoot_minutes": 180,
+      "cast_ids": ["ACTOR_MAYA", "ACTOR_JULIAN"],
+      "description": "Resolution overlooking the Manhattan skyline at dusk."
+    }
+  ]
+}
