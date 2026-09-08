@@ -117,6 +117,22 @@ def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = 
             STATE["max_minutes_per_day"] = data.get("max_minutes_per_day", 600)
             STATE["active_disruptions"] = []
 
+            # Populate pre-planned actor blackouts from actor contract data or preset
+            actor_bl: Dict[str, List[int]] = {k: list(v) for k, v in data.get("actor_blackouts", {}).items()}
+            for a in STATE["actors"]:
+                if a.blackout_days:
+                    actor_bl[a.actor_id] = sorted(list(set(actor_bl.get(a.actor_id, []) + list(a.blackout_days))))
+                elif a.actor_id in actor_bl:
+                    a.blackout_days = list(actor_bl[a.actor_id])
+            STATE["actor_blackouts"] = actor_bl
+
+            # Populate pre-planned location municipal permit blackouts
+            STATE["location_blackouts"] = {k: list(v) for k, v in data.get("location_blackouts", {}).items()}
+
+            # Populate pre-planned dark days / hiatus days
+            STATE["dark_days"] = list(data.get("dark_days", []))
+            STATE["soft_locks"] = {}
+
     # Calculate naive script-order schedule baseline
     naive_solution = generate_naive_schedule(
         scenes=STATE["scenes"],
@@ -129,21 +145,15 @@ def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = 
         start_date=STATE.get("start_date", "2026-10-12")
     )
     naive_solution.production_id = STATE["production_id"]
+    naive_solution.actor_blackouts = {k: list(v) for k, v in STATE.get("actor_blackouts", {}).items() if v}
+    naive_solution.location_blackouts = {k: list(v) for k, v in STATE.get("location_blackouts", {}).items() if v}
+    naive_solution.dark_days = list(STATE.get("dark_days", []))
     STATE["naive_cost"] = naive_solution.metrics.objective_cost
 
     if not optimize:
         STATE["current_solution"] = naive_solution
     else:
-        solver = StripboardSolver(
-            scenes=STATE["scenes"],
-            actors=STATE["actors"],
-            num_days=STATE["num_days"],
-            max_minutes_per_day=STATE["max_minutes_per_day"],
-            w_turnaround=STATE["w_turnaround"],
-            permit_lead_days=STATE["permit_lead_days"],
-            start_date=STATE.get("start_date", "2026-10-12")
-        )
-        solution = solver.solve(disruptions=[], naive_cost=STATE["naive_cost"])
+        solution = run_solver(disruptions=[], naive_cost=STATE["naive_cost"])
         solution.production_id = STATE["production_id"]
         solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
         STATE["current_solution"] = solution
@@ -153,6 +163,9 @@ def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = 
             STATE["versions"] = [create_version_snapshot("Baseline Schedule (v1)", "Initial production schedule baseline")]
         except Exception:
             pass
+
+# Seed default 5-day demo production on initial startup
+load_seed_data(preset_filename="neon_horizon.json", optimize=True)
 
 class ConnectionManager:
     def __init__(self):

@@ -17,7 +17,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Scene, Actor, DaySchedule, ScheduleSolution, ActorDOODRow } from '../types';
-import { updateProductionPlan, fetchProductionSettings, fetchScenes, fetchActors } from '../services/api';
+import { updateProductionPlan, fetchProductionSettings, fetchScenes, fetchActors, fetchConstraints } from '../services/api';
 
 interface PlanEditorModalProps {
   isOpen: boolean;
@@ -142,11 +142,36 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
       }
 
       // 3. Resolve blackouts, dark days & constraints
-      setDraftActorBlackouts(JSON.parse(JSON.stringify(actorBlackouts || {})));
+      const initialActorBl: Record<string, number[]> = { ...(actorBlackouts || {}) };
+      for (const act of mergedActors) {
+        if (act.blackout_days && act.blackout_days.length > 0) {
+          if (!initialActorBl[act.actor_id] || initialActorBl[act.actor_id].length === 0) {
+            initialActorBl[act.actor_id] = [...act.blackout_days];
+          }
+        }
+      }
+      setDraftActorBlackouts(initialActorBl);
       setDraftLocationBlackouts(JSON.parse(JSON.stringify(locationBlackouts || {})));
       setDraftDarkDays([...(darkDays || [])]);
 
-      // 4. Load latest settings directly from backend
+      // 4. Fetch latest production constraints & settings directly from backend
+      fetchConstraints()
+        .then((c) => {
+          if (c) {
+            setDraftActorBlackouts((prev) => {
+              const merged = { ...(c.actor_blackouts || {}), ...prev };
+              return merged;
+            });
+            if (c.location_blackouts && Object.keys(c.location_blackouts).length > 0) {
+              setDraftLocationBlackouts((prev) => ({ ...(c.location_blackouts || {}), ...prev }));
+            }
+            if (c.dark_days && c.dark_days.length > 0) {
+              setDraftDarkDays(c.dark_days);
+            }
+          }
+        })
+        .catch(() => null);
+
       fetchProductionSettings()
         .then((s) => {
           if (s.start_date) setDraftStartDate(s.start_date);
@@ -211,8 +236,9 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
   const locations = useMemo(() => {
     const set = new Set((scenes || []).map((s) => s.location).filter(Boolean));
     Object.keys(draftLocationBlackouts || {}).forEach((loc) => set.add(loc));
+    Object.keys(locationBlackouts || {}).forEach((loc) => set.add(loc));
     return Array.from(set).sort();
-  }, [scenes, draftLocationBlackouts]);
+  }, [scenes, draftLocationBlackouts, locationBlackouts]);
 
   const totalDays = Math.max(numDays || 5, (days || []).length, 5);
   const allDays = Array.from({ length: totalDays }, (_, i) => i + 1);
@@ -297,6 +323,9 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
       ? current.filter((d) => d !== day)
       : [...current, day].sort((a, b) => a - b);
     setDraftActorBlackouts({ ...draftActorBlackouts, [actorId]: next });
+    setActors((prev) =>
+      prev.map((a) => (a.actor_id === actorId ? { ...a, blackout_days: next } : a))
+    );
   };
 
   // Location blackout toggles
@@ -321,9 +350,13 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
     setIsSubmitting(true);
     setStatusMessage(null);
     try {
+      const syncedActors = actors.map((a) => ({
+        ...a,
+        blackout_days: draftActorBlackouts[a.actor_id] ?? a.blackout_days ?? [],
+      }));
       const res = await updateProductionPlan({
         scenes,
-        actors,
+        actors: syncedActors,
         actor_blackouts: draftActorBlackouts,
         location_blackouts: draftLocationBlackouts,
         dark_days: draftDarkDays,
@@ -616,7 +649,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                 {actors.map((act) => {
-                  const blackouts = (draftActorBlackouts && draftActorBlackouts[act.actor_id]) || [];
+                  const blackouts = (draftActorBlackouts && draftActorBlackouts[act.actor_id]) || act.blackout_days || [];
                   const dood = actorDoodMap.get(act.actor_id);
                   return (
                     <div

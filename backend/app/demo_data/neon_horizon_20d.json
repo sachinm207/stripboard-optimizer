@@ -3,6 +3,20 @@
   "title": "Neon Horizon (20-Day Feature Cut)",
   "num_days": 20,
   "max_minutes_per_day": 600,
+  "actor_blackouts": {
+    "ACTOR_SARAH": [4, 5],
+    "ACTOR_MARCUS": [11],
+    "ACTOR_ELENA": [8, 9],
+    "ACTOR_ALVAREZ": [15],
+    "ACTOR_JUDGE": [1, 2]
+  },
+  "location_blackouts": {
+    "City Docks": [6, 7],
+    "Municipal Courthouse": [2, 3],
+    "Subway Station": [10],
+    "Elena's Penthouse": [16]
+  },
+  "dark_days": [6, 13],
   "actors": [
     {
       "actor_id": "ACTOR_SARAH",
@@ -12,7 +26,7 @@
       "day_rate": 5000.0,
       "hold_rate": 2500.0,
       "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
-      "blackout_days": [],
+      "blackout_days": [4, 5],
       "is_principal": true
     },
     {
@@ -23,7 +37,7 @@
       "day_rate": 4500.0,
       "hold_rate": 2000.0,
       "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
-      "blackout_days": [],
+      "blackout_days": [11],
       "is_principal": true
     },
     {
@@ -34,7 +48,7 @@
       "day_rate": 4000.0,
       "hold_rate": 1800.0,
       "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
-      "blackout_days": [],
+      "blackout_days": [8, 9],
       "is_principal": true
     },
     {
@@ -56,7 +70,7 @@
       "day_rate": 2200.0,
       "hold_rate": 1100.0,
       "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
-      "blackout_days": [],
+      "blackout_days": [15],
       "is_principal": false
     },
     {
@@ -100,7 +114,7 @@
       "day_rate": 2000.0,
       "hold_rate": 1000.0,
       "sag_tier": "SAG_THEATRICAL_DAY_PLAYER",
-      "blackout_days": [],
+      "blackout_days": [1, 2],
       "is_principal": false
     },
     {

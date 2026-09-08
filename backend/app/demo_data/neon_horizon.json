@@ -3,6 +3,15 @@
   "title": "Neon Horizon",
   "num_days": 5,
   "max_minutes_per_day": 600,
+  "actor_blackouts": {
+    "ACTOR_SARAH": [4],
+    "ACTOR_ELENA": [2]
+  },
+  "location_blackouts": {
+    "Harbor Pier 42": [1],
+    "Desert Highway": [5]
+  },
+  "dark_days": [],
   "actors": [
     {
       "actor_id": "ACTOR_SARAH",
@@ -12,7 +21,7 @@
       "day_rate": 5000.0,
       "hold_rate": 2500.0,
       "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
-      "blackout_days": [],
+      "blackout_days": [4],
       "is_principal": true
     },
     {
@@ -34,7 +43,7 @@
       "day_rate": 4000.0,
       "hold_rate": 1800.0,
       "sag_tier": "SAG_THEATRICAL_SCHEDULE_A",
-      "blackout_days": [],
+      "blackout_days": [2],
       "is_principal": true
     },
     {
