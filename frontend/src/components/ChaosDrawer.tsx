@@ -33,23 +33,33 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
 }) => {
   const [selectedActor, setSelectedActor] = useState(actors[0]?.actor_id || 'ACTOR_SARAH');
   const [selectedLocation, setSelectedLocation] = useState(scenes[0]?.location || 'Warehouse District');
-  const [disruptionType, setDisruptionType] = useState('ACTOR_ILLNESS');
+  const [disruptionType, setDisruptionType] = useState('ACTOR_DISRUPTION');
   const [selectedDays, setSelectedDays] = useState<number[]>([2]);
-  const [reason, setReason] = useState('Emergency medical isolation (48h)');
+  const [reason, setReason] = useState('');
 
   if (!isOpen) return null;
 
   const locations = Array.from(new Set(scenes.map((s) => s.location)));
+
+  const isActor = disruptionType === 'ACTOR_DISRUPTION' || disruptionType === 'ACTOR_ILLNESS';
+  const isDay = disruptionType === 'DAY_SHUTDOWN';
+  const isLocation = disruptionType === 'LOCATION_DISRUPTION' || disruptionType === 'LOCATION_UNAVAILABLE' || (!isActor && !isDay);
 
   const createAlertObject = (): DisruptionAlert => ({
     alert_id: `chaos_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     production_id: 'prod_neon_horizon',
     disruption_type: disruptionType,
     severity: 'CRITICAL',
-    affected_actor_id: disruptionType === 'ACTOR_ILLNESS' ? selectedActor : undefined,
-    affected_location: disruptionType !== 'ACTOR_ILLNESS' ? selectedLocation : undefined,
+    affected_actor_id: isActor ? selectedActor : undefined,
+    affected_location: isLocation ? selectedLocation : undefined,
     affected_shoot_days: [...selectedDays],
-    reason: reason || 'Production disruption incident',
+    reason:
+      reason ||
+      (isDay
+        ? 'Force Majeure Emergency Day Shutdown'
+        : isActor
+        ? `${actors.find((a) => a.actor_id === selectedActor)?.name || 'Actor'} unavailable for call`
+        : `${selectedLocation} unavailable for filming`),
   });
 
   const handleAddCustomDisruption = (e: React.FormEvent) => {
@@ -136,18 +146,30 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                 </button>
               </div>
               <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                {activeDisruptions.map((d, i) => (
-                  <div
-                    key={i}
-                    className="p-2.5 rounded-lg bg-slate-900 border border-amber-500/30 text-xs"
-                  >
-                    <div className="font-semibold text-white">{d.disruption_type}</div>
-                    <p className="text-slate-300 text-[11px] mt-0.5">{d.reason}</p>
-                    <div className="text-[10px] text-amber-400/80 mt-1 font-mono">
-                      Affected Days: {d.affected_shoot_days.map((x) => `Day ${x}`).join(', ')}
+                {activeDisruptions.map((d, i) => {
+                  const actorMatch = actors.find((a) => a.actor_id === d.affected_actor_id);
+                  const isActorType = d.disruption_type === 'ACTOR_DISRUPTION' || d.disruption_type === 'ACTOR_ILLNESS' || Boolean(d.affected_actor_id);
+                  const isDayType = d.disruption_type === 'DAY_SHUTDOWN';
+                  const isLocType = d.disruption_type === 'LOCATION_DISRUPTION' || d.disruption_type === 'LOCATION_UNAVAILABLE' || Boolean(d.affected_location);
+
+                  let title = d.disruption_type;
+                  if (isActorType) title = `🎭 Actor: ${actorMatch ? `${actorMatch.name} (${actorMatch.character_name})` : d.affected_actor_id}`;
+                  else if (isLocType) title = `📍 Location: ${d.affected_location}`;
+                  else if (isDayType) title = `🗓️ Day Shutdown`;
+
+                  return (
+                    <div
+                      key={i}
+                      className="p-2.5 rounded-lg bg-slate-900 border border-amber-500/30 text-xs"
+                    >
+                      <div className="font-semibold text-white">{title}</div>
+                      <p className="text-slate-300 text-[11px] mt-0.5">{d.reason}</p>
+                      <div className="text-[10px] text-amber-400/80 mt-1 font-mono">
+                        Affected Days: {d.affected_shoot_days.map((x) => `Day ${x}`).join(', ')}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : (
@@ -166,21 +188,19 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
           </h4>
           <form onSubmit={handleAddCustomDisruption} className="space-y-3.5">
             <div>
-              <label className="block text-[11px] text-slate-400 font-medium mb-1">Disruption Type</label>
+              <label className="block text-[11px] text-slate-400 font-medium mb-1">Disruption Target / Entity</label>
               <select
                 value={disruptionType}
                 onChange={(e) => setDisruptionType(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
               >
-                <option value="ACTOR_ILLNESS">Actor Illness / Quarantine</option>
-                <option value="WEATHER_EVENT">Extreme Weather Event</option>
-                <option value="LOCATION_UNAVAILABLE">Location Unavailable</option>
-                <option value="PERMIT_REVOCATION">Permit Revocation</option>
-                <option value="DAY_SHUTDOWN">Force Majeure / Emergency Day Shutdown</option>
+                <option value="ACTOR_DISRUPTION">🎭 Actor Disruption (Illness / Conflict / Blackout)</option>
+                <option value="LOCATION_DISRUPTION">📍 Location Disruption (Weather / Permit / Damage)</option>
+                <option value="DAY_SHUTDOWN">🗓️ Entire Day Shutdown (Force Majeure / Emergency / Hiatus)</option>
               </select>
             </div>
 
-            {disruptionType === 'ACTOR_ILLNESS' ? (
+            {isActor ? (
               <div>
                 <label className="block text-[11px] text-slate-400 font-medium mb-1">Affected Actor</label>
                 <select
@@ -195,12 +215,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                   ))}
                 </select>
               </div>
-            ) : disruptionType === 'DAY_SHUTDOWN' ? (
-              <div className="p-2.5 rounded bg-indigo-950/40 border border-indigo-800/50 text-[11px] text-indigo-200">
-                <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />
-                Entire shoot day will be evacuated and declared a zero-shooting hiatus.
-              </div>
-            ) : (
+            ) : isLocation ? (
               <div>
                 <label className="block text-[11px] text-slate-400 font-medium mb-1">Affected Location</label>
                 <select
@@ -214,6 +229,11 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                     </option>
                   ))}
                 </select>
+              </div>
+            ) : (
+              <div className="p-2.5 rounded bg-indigo-950/40 border border-indigo-800/50 text-[11px] text-indigo-200">
+                <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-400" />
+                Entire shoot day will be evacuated and declared a zero-shooting hiatus.
               </div>
             )}
 
@@ -314,7 +334,13 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                 type="text"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Broken crane, union grievance"
+                placeholder={
+                  isDay
+                    ? "e.g. Municipal curfew, flood evacuation, emergency hiatus"
+                    : isActor
+                    ? "e.g. Flu, emergency medical leave, contract conflict"
+                    : "e.g. Permit revoked, structural damage, hurricane warning"
+                }
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
               />
             </div>
