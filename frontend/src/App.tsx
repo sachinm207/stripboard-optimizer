@@ -31,7 +31,6 @@ import {
   toggleSoftLock,
   clearSoftLocks,
   saveVersion,
-  fetchRawScriptOrder,
 } from './services/api';
 import { Scene, Actor, ScheduleSolution, DisruptionAlert, KafkaStatus, UnionAudit } from './types';
 import {
@@ -219,28 +218,6 @@ export const App: React.FC = () => {
       setError(null);
     } catch (err: any) {
       setError('Failed to load preset: ' + err.message);
-    } finally {
-      setIsSolving(false);
-    }
-  };
-
-  const handleViewRawScriptOrder = async () => {
-    setIsSolving(true);
-    try {
-      const rawSol = await fetchRawScriptOrder();
-      setSolution(rawSol);
-      setBaselineSolution(rawSol);
-      setTentativeMoveCount(0);
-      setIsWhatIfActive(false);
-      const [kStat, uAudit] = await Promise.all([
-        fetchKafkaStatus().catch(() => null),
-        fetchUnionAudit().catch(() => null),
-      ]);
-      setKafkaStatus(kStat);
-      setUnionAudit(uAudit);
-      setError(null);
-    } catch (err: any) {
-      setError('Failed to load raw script order: ' + err.message);
     } finally {
       setIsSolving(false);
     }
@@ -656,14 +633,6 @@ export const App: React.FC = () => {
                   >
                     <Flame className="w-3.5 h-3.5 text-rose-400" />
                     <span>Throw Chaos</span>
-                  </button>
-                  <button
-                    onClick={handleViewRawScriptOrder}
-                    disabled={isSolving}
-                    className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-medium transition-all cursor-pointer"
-                    title="Switch back to view the raw unoptimized screenplay order"
-                  >
-                    View Raw Script Order
                   </button>
                 </div>
               </div>

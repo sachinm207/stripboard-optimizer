@@ -110,15 +110,6 @@ export async function loadPreset(presetId: string, optimize: boolean = false): P
   return res.json();
 }
 
-export async function fetchRawScriptOrder(): Promise<ScheduleSolution> {
-  const res = await fetch(`${API_BASE}/schedule/raw-order`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!res.ok) throw new Error('Failed to revert to raw script order');
-  return res.json();
-}
-
 export async function solveSchedule(): Promise<ScheduleSolution> {
   const res = await fetch(`${API_BASE}/schedule/solve`, {
     method: 'POST',
