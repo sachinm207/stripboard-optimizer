@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sliders, ShieldCheck, Clock, Calendar, CheckCircle } from 'lucide-react';
+import { X, Sliders, ShieldCheck, Clock, Calendar, CheckCircle, HelpCircle, Info } from 'lucide-react';
 import { fetchProductionSettings, updateProductionSettings } from '../services/api';
 
 interface SettingsModalProps {
@@ -19,6 +19,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [permitLeadDays, setPermitLeadDays] = useState(0);
   const [maxMinutesPerDay, setMaxMinutesPerDay] = useState(600);
   const [startDate, setStartDate] = useState('2026-10-12');
+  const [showPermitInfo, setShowPermitInfo] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -83,12 +84,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSave} className="p-6 space-y-5">
-          {/* Principal Photography Start Date */}
+          {/* Start Date */}
           <div className="border-b border-slate-800 pb-4">
             <label className="block text-xs font-bold text-white mb-1 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-purple-400" />
-                Principal Photography Start Date (Day 1)
+                Start Date (Day 1)
               </span>
               <span className="text-purple-300 font-mono font-bold text-xs">{startDate}</span>
             </label>
@@ -137,20 +138,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <label className="block text-xs font-bold text-white mb-1 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-sky-400" />
-                Location Permit Lead-Time ("Frozen Horizon")
+                <span>Location Permit Lead-Time ("Frozen Horizon")</span>
+                <button
+                  type="button"
+                  onClick={() => setShowPermitInfo(!showPermitInfo)}
+                  className="text-slate-400 hover:text-sky-300 transition-colors cursor-pointer p-0.5"
+                  title="What is permit lead-time & frozen horizon?"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
               </span>
               <span className="text-sky-400 font-mono font-black">{permitLeadDays} Day{permitLeadDays !== 1 ? 's' : ''} Notice</span>
             </label>
-            <p className="text-[11px] text-slate-400 mb-2.5">
+            <p className="text-[11px] text-slate-400 mb-2">
               Minimum advance notice required to secure municipal city permits. Restricts sudden rescheduling to unpermitted exterior locations.
             </p>
-            <div className="flex items-center gap-2">
+
+            {/* Help / Explanatory Callout */}
+            {showPermitInfo && (
+              <div className="p-3 my-2.5 rounded-xl bg-sky-950/60 border border-sky-800/80 text-sky-200 text-xs space-y-2 animate-fade-in shadow-inner">
+                <div className="font-bold flex items-center justify-between text-sky-300">
+                  <span className="flex items-center gap-1.5">
+                    <Info className="w-4 h-4 text-sky-400" />
+                    Why Productions Need Permit Lead-Time ("Frozen Horizon")
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPermitInfo(false)}
+                    className="text-sky-400 hover:text-white cursor-pointer font-bold px-1"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="text-[11px] leading-relaxed text-sky-200/90">
+                  🏛️ <strong>Municipal Reality:</strong> City film commissions (e.g. FilmLA, NYC Mayor's Office) legally require 2 to 5 business days advance notice to issue street closures, drone approvals, or police escorts.
+                </p>
+                <p className="text-[11px] leading-relaxed text-sky-200/90">
+                  ❄️ <strong>The "Frozen Horizon":</strong> When disruptions occur, this setting locks the immediate upcoming days so the AI solver won't illegally reschedule unpermitted exterior scenes into tomorrow's call sheet before permits can be secured. Interior soundstage scenes remain flexible (0 days).
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 mt-2">
               {[0, 1, 2, 3, 4].map((d) => (
                 <button
                   key={d}
                   type="button"
                   onClick={() => setPermitLeadDays(d)}
-                  className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all ${
+                  className={`flex-1 py-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                     permitLeadDays === d
                       ? 'bg-sky-500 text-slate-950 border-sky-400 shadow-sm'
                       : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
