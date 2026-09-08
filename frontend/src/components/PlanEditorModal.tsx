@@ -241,7 +241,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
     return Array.from(set).sort();
   }, [scenes, draftLocationBlackouts, locationBlackouts]);
 
-  const totalDays = Math.max(numDays || 5, (days || []).length, 5);
+  const totalDays = Math.max(numDays || 20, (days || []).length, 20);
   const allDays = Array.from({ length: totalDays }, (_, i) => i + 1);
 
   // Dynamic calendar date helper

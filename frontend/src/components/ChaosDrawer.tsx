@@ -15,6 +15,7 @@ interface ChaosDrawerProps {
   days?: DaySchedule[];
   onSolve?: () => void;
   isSolving?: boolean;
+  productionId?: string;
 }
 
 export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
@@ -26,10 +27,11 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
   activeDisruptions,
   actors,
   scenes,
-  numDays = 5,
+  numDays = 20,
   days = [],
   onSolve,
   isSolving = false,
+  productionId,
 }) => {
   const [selectedActor, setSelectedActor] = useState(actors[0]?.actor_id || 'ACTOR_SARAH');
   const [selectedLocation, setSelectedLocation] = useState(scenes[0]?.location || 'Warehouse District');
@@ -55,7 +57,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
 
   const createAlertObject = (): DisruptionAlert => ({
     alert_id: `chaos_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-    production_id: 'prod_neon_horizon',
+    production_id: productionId || 'prod_neon_horizon_20d',
     disruption_type: disruptionType,
     severity: 'CRITICAL',
     affected_actor_id: isActor ? selectedActor : undefined,

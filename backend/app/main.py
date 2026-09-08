@@ -64,7 +64,7 @@ def create_version_snapshot(label: Optional[str] = None, notes: Optional[str] = 
         label=actual_label,
         notes=notes,
         created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        production_id=STATE.get("production_id") or "prod_neon_horizon",
+        production_id=STATE.get("production_id") or "prod_neon_horizon_20d",
         dark_days=list(STATE.get("dark_days", [])),
         actor_blackouts={k: list(v) for k, v in STATE.get("actor_blackouts", {}).items() if v},
         location_blackouts={k: list(v) for k, v in STATE.get("location_blackouts", {}).items() if v},
@@ -97,18 +97,18 @@ def run_solver(disruptions=None, naive_cost=None) -> ScheduleSolution:
         dark_days=STATE.get("dark_days", []),
         soft_locks=STATE.get("soft_locks", {})
     )
-    solution.production_id = STATE.get("production_id") or "prod_neon_horizon"
+    solution.production_id = STATE.get("production_id") or "prod_neon_horizon_20d"
     return solution
 
 memo_agent = ExecutiveMemoAgent()
 union_agent = UnionComplianceAgent()
 
-def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = False):
+def load_seed_data(preset_filename: str = "neon_horizon_20d.json", optimize: bool = False):
     data_path = os.path.join(os.path.dirname(__file__), "demo_data", preset_filename)
     if os.path.exists(data_path):
         with open(data_path, "r") as f:
             data = json.load(f)
-            STATE["production_id"] = data.get("production_id", "prod_neon_horizon")
+            STATE["production_id"] = data.get("production_id", "prod_neon_horizon_20d")
             STATE["title"] = data.get("title", "Neon Horizon")
             STATE["start_date"] = data.get("start_date", "2026-10-12")
             STATE["scenes"] = [Scene(**s) for s in data["scenes"]]
@@ -164,8 +164,8 @@ def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = 
         except Exception:
             pass
 
-# Seed default 5-day demo production on initial startup
-load_seed_data(preset_filename="neon_horizon.json", optimize=True)
+# Seed default 20-day demo production on initial startup
+load_seed_data(preset_filename="neon_horizon_20d.json", optimize=True)
 
 class ConnectionManager:
     def __init__(self):
@@ -415,14 +415,14 @@ async def import_csv_production(req: ImportCSVRequest):
     return solution
 
 class PresetPayload(BaseModel):
-    preset_id: Optional[str] = "neon_horizon"
+    preset_id: Optional[str] = "neon_horizon_20d"
     optimize: bool = False
 
 @app.post("/api/production/load-preset", response_model=ScheduleSolution)
 async def load_preset(preset_id: Optional[str] = None, optimize: bool = False, payload: Optional[PresetPayload] = None):
-    target_id = (payload.preset_id if payload and payload.preset_id else None) or preset_id or "neon_horizon"
+    target_id = (payload.preset_id if payload and payload.preset_id else None) or preset_id or "neon_horizon_20d"
     should_optimize = (payload.optimize if payload and payload.optimize is not None else optimize)
-    filename = "neon_horizon_20d.json" if "20" in target_id else "neon_horizon.json"
+    filename = "neon_horizon.json" if target_id in ("neon_horizon_5d", "neon_horizon") else "neon_horizon_20d.json"
     load_seed_data(preset_filename=filename, optimize=should_optimize)
     if not STATE["current_solution"]:
         raise HTTPException(status_code=500, detail="Could not load preset")

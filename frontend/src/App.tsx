@@ -832,67 +832,28 @@ export const App: React.FC = () => {
             </div>
 
             {/* Production Scenario Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-              {/* Card 1: 5-Day Sprint */}
-              <div className="bg-slate-900/80 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-6 flex flex-col justify-between shadow-xl transition-all group hover:scale-[1.02]">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase">
-                      5 Shoot Days
-                    </span>
-                    <span className="text-xs text-slate-500 font-mono">14 Scenes</span>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white group-hover:text-amber-400 transition-colors">
-                      Neon Horizon: Indie Sprint
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      Downtown LA thriller with warehouse pyro shoot, 4 principal cast members, and strict SAG turnaround constraints.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 pt-2">
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">4 Cast</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">2 Locations</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">Fast Chaos</span>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-slate-800/80">
-                  <button
-                    onClick={() => handleLoadPreset('neon_horizon', false)}
-                    disabled={isSolving}
-                    className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>Load 5-Day Scenario</span>
-                  </button>
-                  <p className="text-[10px] text-slate-500 text-center mt-2">
-                    Loads raw script order first so you can inspect and optimize
-                  </p>
-                </div>
-              </div>
-
-              {/* Card 2: 20-Day Feature */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              {/* Card 1: 20-Day Feature Demo */}
               <div className="bg-slate-900/80 border border-slate-800 hover:border-purple-500/50 rounded-2xl p-6 flex flex-col justify-between shadow-xl transition-all group hover:scale-[1.02]">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 uppercase">
                       20 Shoot Days
                     </span>
-                    <span className="text-xs text-slate-500 font-mono">52 Scenes</span>
+                    <span className="text-xs text-slate-500 font-mono">40 Scenes</span>
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white group-hover:text-purple-400 transition-colors">
-                      Neon Horizon: Feature Film
+                      Neon Horizon: 20-Day Feature Demo
                     </h3>
                     <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      Full union feature production cut. 8 principal actors, 6 practical locations, multi-actor hold-day scheduling, and complex company moves.
+                      Full union feature production cut. 10 principal actors, 8 practical locations, multi-actor hold-day scheduling, contractual blackout windows, and municipal permit constraints.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5 pt-2">
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">8 Cast</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">6 Locations</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">Permit Lead Times</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">10 Cast</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">8 Locations</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">Calendar & Dark Days</span>
                   </div>
                 </div>
 
@@ -903,7 +864,7 @@ export const App: React.FC = () => {
                     className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-purple-600/20 transition-all cursor-pointer"
                   >
                     <Film className="w-3.5 h-3.5" />
-                    <span>Load 20-Day Feature</span>
+                    <span>Load 20-Day Feature Demo</span>
                   </button>
                   <p className="text-[10px] text-slate-500 text-center mt-2">
                     Industry-scale benchmark with $300k+ in potential optimization savings
@@ -911,7 +872,7 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Card 3: Custom Breakdown */}
+              {/* Card 2: Custom Breakdown */}
               <div className="bg-slate-900/80 border border-slate-800 hover:border-sky-500/50 rounded-2xl p-6 flex flex-col justify-between shadow-xl transition-all group hover:scale-[1.02]">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -985,10 +946,11 @@ export const App: React.FC = () => {
         activeDisruptions={solution?.disruptions_applied || []}
         actors={actors}
         scenes={scenes}
-        numDays={solution?.days.length || 5}
+        numDays={solution?.days?.length || 20}
         days={solution?.days || []}
         onSolve={handleSolveSchedule}
         isSolving={isSolving}
+        productionId={solution?.production_id || 'prod_neon_horizon_20d'}
       />
 
       {/* Gemini Line Producer Memo Modal */}

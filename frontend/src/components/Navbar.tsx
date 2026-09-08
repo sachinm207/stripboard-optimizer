@@ -59,13 +59,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-slate-800 border border-slate-700 text-slate-200 flex items-center gap-1.5 shadow-sm">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     <span>
-                      {productionId === 'neon_horizon_20d'
+                      {productionId?.includes('neon_horizon')
                         ? 'Neon Horizon (20-Day Demo)'
-                        : productionId === 'neon_horizon'
-                        ? 'Neon Horizon (5-Day Demo)'
                         : productionId
                         ? productionId.replace(/_/g, ' ')
-                        : 'Active Production'}
+                        : 'Neon Horizon (20-Day Demo)'}
                     </span>
                   </span>
                 )}
