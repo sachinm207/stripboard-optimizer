@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Flame, AlertTriangle, ShieldAlert, CloudRain, Ban, Activity, Plus, Trash2, Zap, Moon } from 'lucide-react';
+import { X, Flame, AlertTriangle, Plus, Trash2, Zap, Moon } from 'lucide-react';
 import { DisruptionAlert, Actor, Scene, DaySchedule } from '../types';
 
 interface ChaosDrawerProps {
@@ -94,58 +94,6 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
   };
 
   const daysList = Array.from({ length: numDays }, (_, i) => i + 1);
-  const triggerPreset = (presetType: string) => {
-    if (presetType === 'SARAH_COVID') {
-      onInject({
-        alert_id: `alert_covid_${Date.now()}`,
-        production_id: 'prod_neon_horizon',
-        disruption_type: 'ACTOR_ILLNESS',
-        severity: 'CRITICAL',
-        affected_actor_id: 'ACTOR_SARAH',
-        affected_shoot_days: [2],
-        reason: 'Lead Actor Sarah Vance tests positive for COVID (48-hr quarantine)',
-      });
-    } else if (presetType === 'WAREHOUSE_FLOOD') {
-      onInject({
-        alert_id: `alert_flood_${Date.now()}`,
-        production_id: 'prod_neon_horizon',
-        disruption_type: 'WEATHER_EVENT',
-        severity: 'CRITICAL',
-        affected_location: 'Warehouse District',
-        affected_shoot_days: [1],
-        reason: 'Severe flash flood at Warehouse District loading docks',
-      });
-    } else if (presetType === 'PERMIT_REVOCATION') {
-      onInject({
-        alert_id: `alert_permit_${Date.now()}`,
-        production_id: 'prod_neon_horizon',
-        disruption_type: 'PERMIT_REVOCATION',
-        severity: 'CRITICAL',
-        affected_location: 'Police Precinct',
-        affected_shoot_days: [4],
-        reason: 'City film commissioner revokes Police Precinct permit for Day 4',
-      });
-    } else if (presetType === 'MARCUS_PRESS') {
-      onInject({
-        alert_id: `alert_marcus_${Date.now()}`,
-        production_id: 'prod_neon_horizon',
-        disruption_type: 'ACTOR_ILLNESS',
-        severity: 'CRITICAL',
-        affected_actor_id: 'ACTOR_MARCUS',
-        affected_shoot_days: [5],
-        reason: 'Det. Marcus Cole required for emergency Broadway commitment on Day 5',
-      });
-    } else if (presetType === 'EMERGENCY_DAY_SHUTDOWN') {
-      onInject({
-        alert_id: `alert_shutdown_${Date.now()}`,
-        production_id: 'prod_neon_horizon',
-        disruption_type: 'DAY_SHUTDOWN',
-        severity: 'CRITICAL',
-        affected_shoot_days: [3],
-        reason: 'Emergency Force Majeure: Citywide flash flood warning and municipal curfew (Day 3 shut down)',
-      });
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
@@ -176,72 +124,10 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
 
         {/* 2-Column Wide Grid Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4">
-          {/* Left Column: 1-Click Presets & Sudden Day Shutdown */}
+          {/* Left Column: Sudden Day Shutdown & Active Disruptions */}
           <div className="space-y-4">
-            {/* 1-Click Production Chaos Presets */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-amber-400" />
-                1-Click Disruption Presets
-              </h4>
-          <div className="space-y-2">
-            <button
-              onClick={() => triggerPreset('SARAH_COVID')}
-              disabled={isSolving}
-              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-rose-500/30 hover:border-rose-500/60 transition-all flex items-start gap-3 group cursor-pointer"
-            >
-              <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-              <div>
-                <div className="font-semibold text-xs text-white">Lead Actor COVID Quarantine</div>
-                <p className="text-[11px] text-slate-400 mt-0.5">Sarah Vance unavailable on Day 2</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => triggerPreset('WAREHOUSE_FLOOD')}
-              disabled={isSolving}
-              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-sky-500/30 hover:border-sky-500/60 transition-all flex items-start gap-3 group cursor-pointer"
-            >
-              <CloudRain className="w-5 h-5 text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-              <div>
-                <div className="font-semibold text-xs text-white">Warehouse Flash Flood</div>
-                <p className="text-[11px] text-slate-400 mt-0.5">Warehouse District shut down on Day 1</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => triggerPreset('PERMIT_REVOCATION')}
-              disabled={isSolving}
-              className="w-full text-left p-3 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-amber-500/30 hover:border-amber-500/60 transition-all flex items-start gap-3 group cursor-pointer"
-            >
-              <Ban className="w-5 h-5 text-amber-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-              <div>
-                <div className="font-semibold text-xs text-white">Precinct Permit Revoked</div>
-                <p className="text-[11px] text-slate-400 mt-0.5">Police Precinct filming prohibited on Day 4</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => triggerPreset('EMERGENCY_DAY_SHUTDOWN')}
-              disabled={isSolving}
-              className="w-full text-left p-3 rounded-lg bg-indigo-950/40 hover:bg-indigo-950/70 border border-indigo-500/50 hover:border-indigo-400 transition-all flex items-start gap-3 group cursor-pointer ring-1 ring-indigo-500/20"
-            >
-              <Moon className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-              <div>
-                <div className="font-semibold text-xs text-white flex items-center gap-1.5">
-                  <span>Sudden Day Shutdown (Force Majeure)</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/30 text-indigo-300 font-bold border border-indigo-500/40">
-                    Preset
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">Preset: Day 3 evacuated and locked down by city curfew</p>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* DEDICATED SUDDEN EMERGENCY DAY SHUTDOWN SECTION */}
-        <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-950/50 via-slate-900 to-rose-950/40 border-2 border-rose-500/50 shadow-xl space-y-3 my-1">
+            {/* DEDICATED SUDDEN EMERGENCY DAY SHUTDOWN SECTION */}
+            <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-950/50 via-slate-900 to-rose-950/40 border-2 border-rose-500/50 shadow-xl space-y-3">
           <div className="flex items-start gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0 mt-0.5">
               <Moon className="w-4 h-4" />
@@ -314,28 +200,65 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
             />
           </div>
 
-          <button
-            type="button"
-            disabled={isSolving}
-            onClick={() => {
-              onInject({
-                alert_id: `alert_shutdown_${Date.now()}`,
-                production_id: 'prod_neon_horizon',
-                disruption_type: 'DAY_SHUTDOWN',
-                severity: 'CRITICAL',
-                affected_shoot_days: [shutdownDay],
-                reason: shutdownReason || `Force Majeure: Emergency Day ${shutdownDay} Shutdown`,
-              });
-            }}
-            className="w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 active:scale-98 text-white text-xs font-bold transition-all shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <Moon className="w-4 h-4" />
-            <span>
-              {isSolving ? 'Evacuating Day...' : `🚨 Evacuate Day ${shutdownDay} & Reschedule Production`}
-            </span>
-          </button>
+            <button
+              type="button"
+              disabled={isSolving}
+              onClick={() => {
+                onInject({
+                  alert_id: `alert_shutdown_${Date.now()}`,
+                  production_id: 'prod_neon_horizon',
+                  disruption_type: 'DAY_SHUTDOWN',
+                  severity: 'CRITICAL',
+                  affected_shoot_days: [shutdownDay],
+                  reason: shutdownReason || `Force Majeure: Emergency Day ${shutdownDay} Shutdown`,
+                });
+              }}
+              className="w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 active:scale-98 text-white text-xs font-bold transition-all shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Moon className="w-4 h-4" />
+              <span>
+                {isSolving ? 'Evacuating Day...' : `🚨 Evacuate Day ${shutdownDay} & Reschedule Production`}
+              </span>
+            </button>
+          </div>
+
+          {/* Active Disruptions Ingested */}
+          {activeDisruptions.length > 0 ? (
+            <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3 shadow-md">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Active Disruptions ({activeDisruptions.length})
+                </h4>
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="text-[11px] text-rose-400 hover:text-rose-300 hover:underline font-medium cursor-pointer"
+                >
+                  Clear All
+                </button>
+              </div>
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {activeDisruptions.map((d, i) => (
+                  <div
+                    key={i}
+                    className="p-2.5 rounded-lg bg-slate-900 border border-amber-500/30 text-xs"
+                  >
+                    <div className="font-semibold text-white">{d.disruption_type}</div>
+                    <p className="text-slate-300 text-[11px] mt-0.5">{d.reason}</p>
+                    <div className="text-[10px] text-amber-400/80 mt-1 font-mono">
+                      Affected Days: {d.affected_shoot_days.map((x) => `Day ${x}`).join(', ')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 text-center text-xs text-slate-400">
+              <span>No disruptions active on current schedule.</span>
+            </div>
+          )}
         </div>
-      </div>
 
       {/* Right Column: Custom Chaos Builder & Staged Batch */}
       <div className="space-y-4">
@@ -597,39 +520,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
         </div>
       </div>
     </div>
-
-    {/* Active Disruptions Ingested */}
-    {activeDisruptions.length > 0 && (
-          <div className="border-t border-slate-800 mt-6 pt-4">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Active Disruptions ({activeDisruptions.length})
-              </h4>
-              <button
-                onClick={onReset}
-                className="text-[11px] text-rose-400 hover:underline font-medium"
-              >
-                Clear All
-              </button>
-            </div>
-            <div className="space-y-2">
-              {activeDisruptions.map((d, i) => (
-                <div
-                  key={i}
-                  className="p-2.5 rounded-lg bg-slate-800/80 border border-amber-500/30 text-xs"
-                >
-                  <div className="font-semibold text-white">{d.disruption_type}</div>
-                  <p className="text-slate-300 text-[11px] mt-0.5">{d.reason}</p>
-                  <div className="text-[10px] text-amber-400/80 mt-1 font-mono">
-                    Affected Days: {d.affected_shoot_days.map((x) => `Day ${x}`).join(', ')}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  </div>
+</div>
+);
 };
