@@ -82,6 +82,8 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
   };
 
   const handleToggleDay = (d: number) => {
+    const daySchedule = days.find((day) => day.day_number === d);
+    if (daySchedule?.is_dark_day) return;
     if (selectedDays.includes(d)) {
       setSelectedDays(selectedDays.filter((x) => x !== d));
     } else {
@@ -273,7 +275,8 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                     <select
                       onChange={(e) => {
                         const val = Number(e.target.value);
-                        if (val && !selectedDays.includes(val)) {
+                        const daySched = days.find((day) => day.day_number === val);
+                        if (val && !daySched?.is_dark_day && !selectedDays.includes(val)) {
                           setSelectedDays([...selectedDays, val].sort((a, b) => a - b));
                         }
                       }}
@@ -287,10 +290,11 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                         .filter((d) => !selectedDays.includes(d))
                         .map((d) => {
                           const daySchedule = days.find((day) => day.day_number === d);
+                          const isDark = Boolean(daySchedule?.is_dark_day);
                           const dateStr = daySchedule?.date_display ? ` (${daySchedule.date_display})` : '';
                           return (
-                            <option key={d} value={d}>
-                              Day {d}{dateStr}
+                            <option key={d} value={d} disabled={isDark}>
+                              Day {d}{dateStr}{isDark ? ' — ⛔ Production Dark Day (Disabled)' : ''}
                             </option>
                           );
                         })}
@@ -324,20 +328,28 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-1.5 max-h-32 overflow-y-auto p-1 bg-slate-950/50 rounded-lg border border-slate-800">
-                  {daysList.map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => handleToggleDay(d)}
-                      className={`w-8 h-7 rounded border text-[11px] font-bold transition-all cursor-pointer ${
-                        selectedDays.includes(d)
-                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
-                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
+                  {daysList.map((d) => {
+                    const daySchedule = days.find((day) => day.day_number === d);
+                    const isDark = Boolean(daySchedule?.is_dark_day);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        disabled={isDark}
+                        onClick={() => handleToggleDay(d)}
+                        className={`w-8 h-7 rounded border text-[11px] font-bold transition-all select-none ${
+                          isDark
+                            ? 'bg-indigo-950/40 text-indigo-400/40 border-indigo-900/40 cursor-not-allowed opacity-50 shadow-none'
+                            : selectedDays.includes(d)
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm cursor-pointer'
+                            : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white cursor-pointer'
+                        }`}
+                        title={isDark ? `Day ${d}: Production Dark Day (Hiatus) — Production suspended` : `Day ${d}`}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

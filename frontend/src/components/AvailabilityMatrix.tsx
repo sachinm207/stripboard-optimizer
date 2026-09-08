@@ -113,8 +113,8 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
 
   // Handlers for Matrix Blackouts Editing (Edit Hard Constraints)
   const handleToggleActorDraftBlackout = (actorId: string, day: number) => {
-    if (!isEditing) return;
-    const current = draftActorBlackouts[actorId] || [];
+    if (!isEditing || (darkDays || []).includes(day) || (draftDarkDays || []).includes(day)) return;
+    const current = (draftActorBlackouts[actorId] || []).filter((d) => !(darkDays || []).includes(d));
     const updated = current.includes(day)
       ? current.filter((d) => d !== day)
       : [...current, day].sort((a, b) => a - b);
@@ -122,8 +122,8 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   };
 
   const handleToggleLocationDraftBlackout = (location: string, day: number) => {
-    if (!isEditing) return;
-    const current = draftLocationBlackouts[location] || [];
+    if (!isEditing || (darkDays || []).includes(day) || (draftDarkDays || []).includes(day)) return;
+    const current = (draftLocationBlackouts[location] || []).filter((d) => !(darkDays || []).includes(d));
     const updated = current.includes(day)
       ? current.filter((d) => d !== day)
       : [...current, day].sort((a, b) => a - b);
@@ -149,10 +149,26 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   // Handlers for Pre-Planned Dark Days Calendar (Configure Dark Days)
   const handleToggleDraftDarkDay = (day: number) => {
     if (!isEditingDarkDays) return;
-    const updated = draftDarkDays.includes(day)
-      ? draftDarkDays.filter((d) => d !== day)
-      : [...draftDarkDays, day].sort((a, b) => a - b);
+    const isAdding = !draftDarkDays.includes(day);
+    const updated = isAdding
+      ? [...draftDarkDays, day].sort((a, b) => a - b)
+      : draftDarkDays.filter((d) => d !== day);
     setDraftDarkDays(updated);
+
+    if (isAdding) {
+      // Clean up actor and location blackouts for this newly dark day
+      const updatedActorBl: Record<string, number[]> = {};
+      Object.entries(draftActorBlackouts).forEach(([aid, bDays]) => {
+        updatedActorBl[aid] = (bDays || []).filter((d) => d !== day);
+      });
+      setDraftActorBlackouts(updatedActorBl);
+
+      const updatedLocBl: Record<string, number[]> = {};
+      Object.entries(draftLocationBlackouts).forEach(([loc, bDays]) => {
+        updatedLocBl[loc] = (bDays || []).filter((d) => d !== day);
+      });
+      setDraftLocationBlackouts(updatedLocBl);
+    }
   };
 
   const handleSaveDarkDays = async () => {
@@ -842,19 +858,20 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                       <td key={d} className="py-2 px-2 text-center">
                         <button
                           type="button"
-                          disabled={isDark && !isEditing}
+                          disabled={isDark}
                           onClick={() => {
+                            if (isDark) return;
                             if (isEditing) {
                               handleToggleActorDraftBlackout(row.actor_id, d);
-                            } else if (!isDark && !isBlackout) {
+                            } else if (!isBlackout) {
                               handleToggleStagedSoftLock(row.actor_id, d);
                             }
                           }}
                           title={
-                            isEditing
+                            isDark
+                              ? `Day ${d} is a company-wide dark day (hiatus) — shooting is suspended`
+                              : isEditing
                               ? `Click to toggle Day ${d} blackout for ${row.name}`
-                              : isDark
-                              ? `Day ${d} is a company-wide dark day`
                               : isBlackout
                               ? `Contractually unavailable (Blackout)`
                               : isStaged
@@ -862,9 +879,11 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                               : `Click to pin Day ${d} (What-If staged)`
                           }
                           className={`w-9 h-8 rounded-md border text-xs flex items-center justify-center transition-all ${cellClass} ${
-                            isEditing
+                            isDark
+                              ? 'cursor-not-allowed opacity-50 shadow-none'
+                              : isEditing
                               ? 'hover:scale-105 hover:border-amber-400 cursor-pointer'
-                              : !isDark && !isBlackout
+                              : !isBlackout
                               ? 'hover:border-sky-400 hover:scale-105 cursor-pointer'
                               : 'cursor-default'
                           }`}
@@ -983,19 +1002,20 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                         <td key={d} className="py-2 px-2 text-center">
                           <button
                             type="button"
-                            disabled={isDark && !isEditing}
+                            disabled={isDark}
                             onClick={() => {
+                              if (isDark) return;
                               if (isEditing) {
                                 handleToggleLocationDraftBlackout(loc, d);
-                              } else if (!isDark && !isBlackout) {
+                              } else if (!isBlackout) {
                                 handleToggleStagedSoftLock(loc, d);
                               }
                             }}
                             title={
-                              isEditing
+                              isDark
+                                ? `Day ${d} is a company-wide dark day (hiatus) — shooting is suspended`
+                                : isEditing
                                 ? `Click to toggle permit blackout on Day ${d} for ${loc}`
-                                : isDark
-                                ? `Day ${d} is a dark day (no shooting)`
                                 : isBlackout
                                 ? `Permit Restricted (Blackout on Day ${d})`
                                 : isStaged
@@ -1003,9 +1023,11 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                                 : `Click to pin Day ${d} for ${loc} (What-If staged)`
                             }
                             className={`w-12 h-8 rounded-md border text-[11px] flex items-center justify-center transition-all ${cellClass} ${
-                              isEditing
+                              isDark
+                                ? 'cursor-not-allowed opacity-50 shadow-none'
+                                : isEditing
                                 ? 'hover:scale-105 hover:border-amber-400 cursor-pointer'
-                                : !isDark && !isBlackout
+                                : !isBlackout
                                 ? 'hover:border-sky-400 hover:scale-105 cursor-pointer'
                                 : 'cursor-default'
                             }`}

@@ -11,7 +11,7 @@
     "ACTOR_JUDGE": [1, 2]
   },
   "location_blackouts": {
-    "City Docks": [6, 7],
+    "City Docks": [7],
     "Municipal Courthouse": [2, 3],
     "Subway Station": [10],
     "Elena's Penthouse": [16]

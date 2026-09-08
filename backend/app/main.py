@@ -117,20 +117,22 @@ def load_seed_data(preset_filename: str = "neon_horizon_20d.json", optimize: boo
             STATE["max_minutes_per_day"] = data.get("max_minutes_per_day", 600)
             STATE["active_disruptions"] = []
 
-            # Populate pre-planned actor blackouts from actor contract data or preset
-            actor_bl: Dict[str, List[int]] = {k: list(v) for k, v in data.get("actor_blackouts", {}).items()}
+            # Populate pre-planned dark days / hiatus days
+            STATE["dark_days"] = list(data.get("dark_days", []))
+            dark_set = set(STATE["dark_days"])
+
+            # Populate pre-planned actor blackouts from actor contract data or preset (excluding dark days)
+            actor_bl: Dict[str, List[int]] = {k: [d for d in v if d not in dark_set] for k, v in data.get("actor_blackouts", {}).items()}
             for a in STATE["actors"]:
                 if a.blackout_days:
-                    actor_bl[a.actor_id] = sorted(list(set(actor_bl.get(a.actor_id, []) + list(a.blackout_days))))
+                    actor_bl[a.actor_id] = sorted(list(set([d for d in actor_bl.get(a.actor_id, []) + list(a.blackout_days) if d not in dark_set])))
+                    a.blackout_days = list(actor_bl[a.actor_id])
                 elif a.actor_id in actor_bl:
                     a.blackout_days = list(actor_bl[a.actor_id])
             STATE["actor_blackouts"] = actor_bl
 
-            # Populate pre-planned location municipal permit blackouts
-            STATE["location_blackouts"] = {k: list(v) for k, v in data.get("location_blackouts", {}).items()}
-
-            # Populate pre-planned dark days / hiatus days
-            STATE["dark_days"] = list(data.get("dark_days", []))
+            # Populate pre-planned location municipal permit blackouts (excluding dark days)
+            STATE["location_blackouts"] = {k: [d for d in v if d not in dark_set] for k, v in data.get("location_blackouts", {}).items()}
             STATE["soft_locks"] = {}
 
     # Calculate naive script-order schedule baseline
@@ -613,12 +615,14 @@ def get_production_constraints():
 
 @app.post("/api/production/constraints", response_model=ScheduleSolution)
 async def update_production_constraints(req: UpdateConstraintsRequest):
-    if req.actor_blackouts is not None:
-        STATE["actor_blackouts"] = req.actor_blackouts
-    if req.location_blackouts is not None:
-        STATE["location_blackouts"] = req.location_blackouts
     if req.dark_days is not None:
         STATE["dark_days"] = req.dark_days
+    dark_days_set = set(STATE.get("dark_days", []))
+
+    if req.actor_blackouts is not None:
+        STATE["actor_blackouts"] = {k: [d for d in v if d not in dark_days_set] for k, v in req.actor_blackouts.items()}
+    if req.location_blackouts is not None:
+        STATE["location_blackouts"] = {k: [d for d in v if d not in dark_days_set] for k, v in req.location_blackouts.items()}
     if req.soft_locks is not None:
         STATE["soft_locks"] = req.soft_locks
 
@@ -655,14 +659,19 @@ class UpdatePlanRequest(BaseModel):
 async def update_production_plan(req: UpdatePlanRequest):
     if req.scenes is not None:
         STATE["scenes"] = req.scenes
-    if req.actors is not None:
-        STATE["actors"] = req.actors
-    if req.actor_blackouts is not None:
-        STATE["actor_blackouts"] = req.actor_blackouts
-    if req.location_blackouts is not None:
-        STATE["location_blackouts"] = req.location_blackouts
     if req.dark_days is not None:
         STATE["dark_days"] = req.dark_days
+    dark_days_set = set(STATE.get("dark_days", []))
+
+    if req.actor_blackouts is not None:
+        STATE["actor_blackouts"] = {k: [d for d in v if d not in dark_days_set] for k, v in req.actor_blackouts.items()}
+    if req.actors is not None:
+        for a in req.actors:
+            if a.blackout_days:
+                a.blackout_days = [d for d in a.blackout_days if d not in dark_days_set]
+        STATE["actors"] = req.actors
+    if req.location_blackouts is not None:
+        STATE["location_blackouts"] = {k: [d for d in v if d not in dark_days_set] for k, v in req.location_blackouts.items()}
 
     ps = STATE.setdefault("production_settings", ProductionSettings())
     if req.start_date is not None:

@@ -143,31 +143,52 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
       }
 
       // 3. Resolve blackouts, dark days & constraints
-      const initialActorBl: Record<string, number[]> = { ...(actorBlackouts || {}) };
+      const resolvedDark = [...(darkDays || [])];
+      const darkSet = new Set(resolvedDark);
+      const initialActorBl: Record<string, number[]> = {};
+      for (const [aid, bDays] of Object.entries(actorBlackouts || {})) {
+        initialActorBl[aid] = (bDays || []).filter((d) => !darkSet.has(d));
+      }
       for (const act of mergedActors) {
         if (act.blackout_days && act.blackout_days.length > 0) {
           if (!initialActorBl[act.actor_id] || initialActorBl[act.actor_id].length === 0) {
-            initialActorBl[act.actor_id] = [...act.blackout_days];
+            initialActorBl[act.actor_id] = act.blackout_days.filter((d) => !darkSet.has(d));
           }
         }
       }
+      const initialLocBl: Record<string, number[]> = {};
+      for (const [loc, bDays] of Object.entries(locationBlackouts || {})) {
+        initialLocBl[loc] = (bDays || []).filter((d) => !darkSet.has(d));
+      }
+
       setDraftActorBlackouts(initialActorBl);
-      setDraftLocationBlackouts(JSON.parse(JSON.stringify(locationBlackouts || {})));
-      setDraftDarkDays([...(darkDays || [])]);
+      setDraftLocationBlackouts(initialLocBl);
+      setDraftDarkDays(resolvedDark);
 
       // 4. Fetch latest production constraints & settings directly from backend
       fetchConstraints()
         .then((c) => {
           if (c) {
+            const activeDark = c.dark_days && c.dark_days.length > 0 ? c.dark_days : resolvedDark;
+            const activeDarkSet = new Set(activeDark);
+            setDraftDarkDays(activeDark);
             setDraftActorBlackouts((prev) => {
               const merged = { ...(c.actor_blackouts || {}), ...prev };
-              return merged;
+              const cleaned: Record<string, number[]> = {};
+              Object.entries(merged).forEach(([k, v]) => {
+                cleaned[k] = (v || []).filter((d) => !activeDarkSet.has(d));
+              });
+              return cleaned;
             });
             if (c.location_blackouts && Object.keys(c.location_blackouts).length > 0) {
-              setDraftLocationBlackouts((prev) => ({ ...(c.location_blackouts || {}), ...prev }));
-            }
-            if (c.dark_days && c.dark_days.length > 0) {
-              setDraftDarkDays(c.dark_days);
+              setDraftLocationBlackouts((prev) => {
+                const merged = { ...(c.location_blackouts || {}), ...prev };
+                const cleaned: Record<string, number[]> = {};
+                Object.entries(merged).forEach(([k, v]) => {
+                  cleaned[k] = (v || []).filter((d) => !activeDarkSet.has(d));
+                });
+                return cleaned;
+              });
             }
           }
         })
@@ -332,7 +353,8 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
   // Actor blackout toggles
   const handleToggleActorBlackout = (actorId: string, day: number) => {
-    const current = draftActorBlackouts[actorId] || [];
+    if (draftDarkDays.includes(day)) return; // Dark days cannot be toggled to blackouts
+    const current = (draftActorBlackouts[actorId] || []).filter((d) => !draftDarkDays.includes(d));
     const next = current.includes(day)
       ? current.filter((d) => d !== day)
       : [...current, day].sort((a, b) => a - b);
@@ -344,7 +366,8 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
   // Location blackout toggles
   const handleToggleLocationBlackout = (locName: string, day: number) => {
-    const current = draftLocationBlackouts[locName] || [];
+    if (draftDarkDays.includes(day)) return; // Dark days cannot be toggled to blackouts
+    const current = (draftLocationBlackouts[locName] || []).filter((d) => !draftDarkDays.includes(d));
     const next = current.includes(day)
       ? current.filter((d) => d !== day)
       : [...current, day].sort((a, b) => a - b);
@@ -353,10 +376,32 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
   // Dark day toggles
   const handleToggleDarkDay = (day: number) => {
-    const next = draftDarkDays.includes(day)
-      ? draftDarkDays.filter((d) => d !== day)
-      : [...draftDarkDays, day].sort((a, b) => a - b);
-    setDraftDarkDays(next);
+    const isAddingDark = !draftDarkDays.includes(day);
+    const nextDark = isAddingDark
+      ? [...draftDarkDays, day].sort((a, b) => a - b)
+      : draftDarkDays.filter((d) => d !== day);
+    setDraftDarkDays(nextDark);
+
+    if (isAddingDark) {
+      // Clean up actor and location blackouts for this newly dark day
+      const updatedActorBlackouts: Record<string, number[]> = {};
+      Object.entries(draftActorBlackouts).forEach(([aid, bDays]) => {
+        updatedActorBlackouts[aid] = (bDays || []).filter((d) => d !== day);
+      });
+      setDraftActorBlackouts(updatedActorBlackouts);
+      setActors((prev) =>
+        prev.map((a) => ({
+          ...a,
+          blackout_days: (a.blackout_days || []).filter((d) => d !== day),
+        }))
+      );
+
+      const updatedLocBlackouts: Record<string, number[]> = {};
+      Object.entries(draftLocationBlackouts).forEach(([loc, bDays]) => {
+        updatedLocBlackouts[loc] = (bDays || []).filter((d) => d !== day);
+      });
+      setDraftLocationBlackouts(updatedLocBlackouts);
+    }
   };
 
   // Save full official plan
@@ -811,33 +856,32 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                         <div className="flex flex-wrap items-center gap-1.5">
                           {allDays.map((d) => {
                             const isDark = draftDarkDays.includes(d);
-                            const isBlackout = blackouts.includes(d);
+                            const isBlackout = !isDark && blackouts.includes(d);
                             const dateStr = getFormattedDate(draftStartDate, d);
                             return (
                               <button
                                 key={d}
                                 type="button"
+                                disabled={isDark}
                                 onClick={() => handleToggleActorBlackout(act.actor_id, d)}
-                                className={`min-w-[34px] h-8 px-1 rounded border text-[11px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center ${
-                                  isBlackout
-                                    ? 'bg-rose-600 text-white border-rose-500 shadow-sm shadow-rose-900/40 ring-1 ring-rose-400'
-                                    : isDark
-                                    ? 'bg-indigo-950/80 text-indigo-300 border-indigo-700/80 hover:border-indigo-500'
-                                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
+                                className={`min-w-[34px] h-8 px-1 rounded border text-[11px] font-bold transition-all flex flex-col items-center justify-center select-none ${
+                                  isDark
+                                    ? 'bg-indigo-950/40 text-indigo-400/50 border-indigo-900/50 cursor-not-allowed opacity-60 shadow-none'
+                                    : isBlackout
+                                    ? 'bg-rose-600 text-white border-rose-500 shadow-sm shadow-rose-900/40 ring-1 ring-rose-400 cursor-pointer hover:bg-rose-500'
+                                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white cursor-pointer'
                                 }`}
                                 title={
-                                  isBlackout && isDark
-                                    ? `Day ${d} (${dateStr}): Contract Blackout & Production Dark Day`
+                                  isDark
+                                    ? `Day ${d} (${dateStr}): Production Dark Day (Hiatus) — Set is closed, filming suspended. Blackouts cannot be assigned to dark days.`
                                     : isBlackout
-                                    ? `Day ${d} (${dateStr}): Contract Blackout (Actor Off)`
-                                    : isDark
-                                    ? `Day ${d} (${dateStr}): Production Hiatus / Dark Day (Set Closed)`
-                                    : `Day ${d} (${dateStr}): Available for Call`
+                                    ? `Day ${d} (${dateStr}): Contract Blackout (Actor Off) — Click to remove`
+                                    : `Day ${d} (${dateStr}): Available for Call — Click to toggle blackout`
                                 }
                               >
-                                <span className="leading-tight">{d}</span>
+                                <span className={`leading-tight ${isDark ? 'line-through text-indigo-400/50' : ''}`}>{d}</span>
                                 {isDark && (
-                                  <span className="text-[7.5px] uppercase font-mono tracking-tighter text-indigo-400 font-extrabold leading-none">
+                                  <span className="text-[7.5px] uppercase font-mono tracking-tighter text-indigo-400/70 font-extrabold leading-none">
                                     DARK
                                   </span>
                                 )}
@@ -850,10 +894,10 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                             <span className="w-2.5 h-2.5 rounded-sm bg-rose-600 inline-block" /> Contract Blackout
                           </span>
                           <span className="flex items-center gap-1">
-                            <span className="w-2.5 h-2.5 rounded-sm bg-indigo-950 border border-indigo-700 inline-block" /> Production Dark Day (Hiatus)
+                            <span className="w-2.5 h-2.5 rounded-sm bg-indigo-950/60 border border-indigo-900/60 inline-block opacity-60" /> Production Dark Day (Hiatus - Disabled)
                           </span>
                           <span className="flex items-center gap-1">
-                            <span className="w-2.5 h-2.5 rounded-sm bg-slate-900 border border-slate-800 inline-block" /> Available
+                            <span className="w-2.5 h-2.5 rounded-sm bg-slate-900 border border-slate-800 inline-block" /> Available for Call
                           </span>
                         </div>
                       </div>
@@ -961,33 +1005,32 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                         <div className="flex flex-wrap items-center gap-1.5">
                           {allDays.map((d) => {
                             const isDark = draftDarkDays.includes(d);
-                            const isBlackout = blackouts.includes(d);
+                            const isBlackout = !isDark && blackouts.includes(d);
                             const dateStr = getFormattedDate(draftStartDate, d);
                             return (
                               <button
                                 key={d}
                                 type="button"
+                                disabled={isDark}
                                 onClick={() => handleToggleLocationBlackout(loc, d)}
-                                className={`min-w-[34px] h-8 px-1 rounded border text-[11px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center ${
-                                  isBlackout
-                                    ? 'bg-sky-600 text-white border-sky-500 shadow-sm shadow-sky-900/40 ring-1 ring-sky-400'
-                                    : isDark
-                                    ? 'bg-indigo-950/80 text-indigo-300 border-indigo-700/80 hover:border-indigo-500'
-                                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
+                                className={`min-w-[34px] h-8 px-1 rounded border text-[11px] font-bold transition-all flex flex-col items-center justify-center select-none ${
+                                  isDark
+                                    ? 'bg-indigo-950/40 text-indigo-400/50 border-indigo-900/50 cursor-not-allowed opacity-60 shadow-none'
+                                    : isBlackout
+                                    ? 'bg-sky-600 text-white border-sky-500 shadow-sm shadow-sky-900/40 ring-1 ring-sky-400 cursor-pointer hover:bg-sky-500'
+                                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white cursor-pointer'
                                 }`}
                                 title={
-                                  isBlackout && isDark
-                                    ? `Day ${d} (${dateStr}): Permit Blackout & Production Dark Day`
+                                  isDark
+                                    ? `Day ${d} (${dateStr}): Production Dark Day (Hiatus) — Production suspended. Permit blackouts cannot be applied to dark days.`
                                     : isBlackout
-                                    ? `Day ${d} (${dateStr}): Permit Blackout (Location Closed)`
-                                    : isDark
-                                    ? `Day ${d} (${dateStr}): Production Hiatus / Dark Day (No Filming Permitted)`
-                                    : `Day ${d} (${dateStr}): Filming Permitted`
+                                    ? `Day ${d} (${dateStr}): Permit Blackout (Location Closed) — Click to remove`
+                                    : `Day ${d} (${dateStr}): Filming Permitted — Click to toggle permit blackout`
                                 }
                               >
-                                <span className="leading-tight">{d}</span>
+                                <span className={`leading-tight ${isDark ? 'line-through text-indigo-400/50' : ''}`}>{d}</span>
                                 {isDark && (
-                                  <span className="text-[7.5px] uppercase font-mono tracking-tighter text-indigo-400 font-extrabold leading-none">
+                                  <span className="text-[7.5px] uppercase font-mono tracking-tighter text-indigo-400/70 font-extrabold leading-none">
                                     DARK
                                   </span>
                                 )}
@@ -1000,7 +1043,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                             <span className="w-2.5 h-2.5 rounded-sm bg-sky-600 inline-block" /> Municipal Permit Blackout
                           </span>
                           <span className="flex items-center gap-1">
-                            <span className="w-2.5 h-2.5 rounded-sm bg-indigo-950 border border-indigo-700 inline-block" /> Production Dark Day (Hiatus)
+                            <span className="w-2.5 h-2.5 rounded-sm bg-indigo-950/60 border border-indigo-900/60 inline-block opacity-60" /> Production Dark Day (Hiatus - Disabled)
                           </span>
                           <span className="flex items-center gap-1">
                             <span className="w-2.5 h-2.5 rounded-sm bg-slate-900 border border-slate-800 inline-block" /> Filming Permitted
