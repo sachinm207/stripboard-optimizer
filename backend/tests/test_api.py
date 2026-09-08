@@ -167,9 +167,14 @@ def test_import_custom_production():
     res = client.post("/api/production/import", json=payload)
     assert res.status_code == 200
     sol = res.json()
-    assert sol["status"] in ("OPTIMAL", "FEASIBLE")
+    assert sol["status"] == "RAW_UNOPTIMIZED"
     assert sol["production_id"] == "prod_indie_short"
     assert len(sol["days"]) == 3
+
+    # Now solve it to verify the optimization magic
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    assert solve_res.json()["status"] in ("OPTIMAL", "FEASIBLE")
 
 def test_import_csv_production():
     csv_data = """scene_number,slugline,setting,location,pages_eighths,est_shoot_minutes,cast_names,description
@@ -186,9 +191,20 @@ def test_import_csv_production():
     })
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] in ("OPTIMAL", "FEASIBLE")
+    assert data["status"] == "RAW_UNOPTIMIZED"
     assert len(data["days"]) == 3
     assert len(data["dood_matrix"]) >= 3
+
+    # Solve it
+    solve_res = client.post("/api/schedule/solve")
+    assert solve_res.status_code == 200
+    assert solve_res.json()["status"] in ("OPTIMAL", "FEASIBLE")
+
+def test_raw_order_endpoint():
+    res = client.post("/api/schedule/raw-order")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "RAW_UNOPTIMIZED"
 
 def test_load_20d_preset():
     res = client.post("/api/production/load-preset?preset_id=neon_horizon_20d")

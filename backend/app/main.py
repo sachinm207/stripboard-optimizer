@@ -339,6 +339,7 @@ class ImportProductionRequest(BaseModel):
     max_minutes_per_day: int = 600
     scenes: List[Scene]
     actors: List[Actor]
+    optimize: bool = False
 
 @app.post("/api/production/import", response_model=ScheduleSolution)
 async def import_production(req: ImportProductionRequest):
@@ -349,23 +350,34 @@ async def import_production(req: ImportProductionRequest):
     STATE["num_days"] = req.num_days
     STATE["max_minutes_per_day"] = req.max_minutes_per_day
     STATE["active_disruptions"] = []
+    STATE["soft_locks"] = {}
+    STATE["dark_days"] = []
+    STATE["actor_blackouts"] = {}
+    STATE["location_blackouts"] = {}
 
-    solver = StripboardSolver(
+    naive_solution = generate_naive_schedule(
         scenes=STATE["scenes"],
         actors=STATE["actors"],
         num_days=STATE["num_days"],
         max_minutes_per_day=STATE["max_minutes_per_day"],
         w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
+        start_date=STATE.get("start_date", "2026-10-12")
     )
-    solution = solver.solve(disruptions=[])
-    solution.production_id = req.production_id
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
+    naive_solution.production_id = req.production_id
+    STATE["naive_cost"] = naive_solution.metrics.objective_cost
+    STATE["naive_baseline_solution"] = naive_solution
+
+    if req.optimize:
+        sol = run_solver()
+        sol.executive_memo = memo_agent.generate_memo(sol, use_ai=False)
+        STATE["current_solution"] = sol
+    else:
+        STATE["current_solution"] = naive_solution
+
     await event_bus.publish("production.scene.catalog", [s.model_dump() for s in req.scenes])
     await event_bus.publish("actor.contract.constraints", [a.model_dump() for a in req.actors])
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+    await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+    return STATE["current_solution"]
 
 class ImportCSVRequest(BaseModel):
     title: str = "Imported Production"
@@ -373,6 +385,7 @@ class ImportCSVRequest(BaseModel):
     num_days: Optional[int] = None
     max_minutes_per_day: int = 600
     w_turnaround: Optional[int] = 25000
+    optimize: bool = False
 
 @app.post("/api/production/import-csv", response_model=ScheduleSolution)
 async def import_csv_production(req: ImportCSVRequest):
@@ -398,23 +411,34 @@ async def import_csv_production(req: ImportCSVRequest):
     if req.w_turnaround:
         STATE["w_turnaround"] = req.w_turnaround
     STATE["active_disruptions"] = []
+    STATE["soft_locks"] = {}
+    STATE["dark_days"] = []
+    STATE["actor_blackouts"] = {}
+    STATE["location_blackouts"] = {}
 
-    solver = StripboardSolver(
+    naive_solution = generate_naive_schedule(
         scenes=STATE["scenes"],
         actors=STATE["actors"],
         num_days=STATE["num_days"],
         max_minutes_per_day=STATE["max_minutes_per_day"],
         w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
+        start_date=STATE.get("start_date", "2026-10-12")
     )
-    solution = solver.solve(disruptions=[])
-    solution.production_id = STATE["production_id"]
-    solution.executive_memo = memo_agent.generate_memo(solution, use_ai=False)
-    STATE["current_solution"] = solution
+    naive_solution.production_id = STATE["production_id"]
+    STATE["naive_cost"] = naive_solution.metrics.objective_cost
+    STATE["naive_baseline_solution"] = naive_solution
+
+    if req.optimize:
+        sol = run_solver()
+        sol.executive_memo = memo_agent.generate_memo(sol, use_ai=False)
+        STATE["current_solution"] = sol
+    else:
+        STATE["current_solution"] = naive_solution
+
     await event_bus.publish("production.scene.catalog", [s.model_dump() for s in scenes])
     await event_bus.publish("actor.contract.constraints", [a.model_dump() for a in actors])
-    await event_bus.publish("schedule.optimized.solution", solution.model_dump())
-    return solution
+    await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
+    return STATE["current_solution"]
 
 class PresetPayload(BaseModel):
     preset_id: Optional[str] = "neon_horizon_20d"
@@ -946,6 +970,23 @@ async def reset_schedule():
         await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
         return STATE["current_solution"]
     raise HTTPException(status_code=400, detail="No active schedule loaded.")
+
+@app.post("/api/schedule/raw-order", response_model=ScheduleSolution)
+async def view_raw_order():
+    if not STATE.get("scenes") or not STATE.get("actors"):
+        raise HTTPException(status_code=400, detail="No active production scenes loaded.")
+    naive_solution = generate_naive_schedule(
+        scenes=STATE["scenes"],
+        actors=STATE["actors"],
+        num_days=STATE["num_days"],
+        max_minutes_per_day=STATE["max_minutes_per_day"],
+        w_turnaround=STATE["w_turnaround"],
+        start_date=STATE.get("start_date", "2026-10-12")
+    )
+    naive_solution.production_id = STATE.get("production_id", "prod_raw")
+    STATE["current_solution"] = naive_solution
+    await event_bus.publish("schedule.optimized.solution", naive_solution.model_dump())
+    return naive_solution
 
 @app.post("/api/memo/generate")
 async def generate_gemini_memo():

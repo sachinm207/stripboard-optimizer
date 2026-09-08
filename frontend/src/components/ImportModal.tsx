@@ -312,10 +312,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             <button
               type="submit"
               disabled={isImporting}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 text-xs font-bold shadow-lg shadow-orange-900/20 transition-all"
+              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 text-xs font-bold shadow-lg shadow-orange-900/20 transition-all cursor-pointer"
             >
               <CheckCircle className="w-4 h-4 text-slate-950" />
-              <span>{isImporting ? 'Importing & Optimizing...' : 'Import & Optimize'}</span>
+              <span>{isImporting ? 'Importing Breakdown...' : 'Import Breakdown'}</span>
             </button>
           </div>
         </form>
