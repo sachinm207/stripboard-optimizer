@@ -631,14 +631,44 @@ async def update_production_constraints(req: UpdateConstraintsRequest):
         STATE["current_solution"].location_blackouts = STATE.get("location_blackouts", {})
         STATE["current_solution"].dark_days = list(STATE.get("dark_days", []))
         STATE["current_solution"].soft_locks = STATE.get("soft_locks", {})
+        dark_set = set(STATE.get("dark_days", []))
+        evacuated_scenes = []
         for d in STATE["current_solution"].days:
-            if d.day_number in STATE["dark_days"]:
+            if d.day_number in dark_set:
                 d.is_dark_day = True
                 if not d.dark_day_reason:
                     d.dark_day_reason = "Pre-planned Hiatus / Dark Day"
+                if d.scenes:
+                    evacuated_scenes.extend(d.scenes)
+                    d.scenes = []
+                    d.total_duration_minutes = 0
+                    d.locations = []
+                    d.company_moves = 0
             elif not any(a.disruption_type == "DAY_SHUTDOWN" and d.day_number in a.affected_shoot_days for a in STATE.get("active_disruptions", [])):
                 d.is_dark_day = False
                 d.dark_day_reason = None
+
+        if evacuated_scenes:
+            active_days = [d for d in STATE["current_solution"].days if d.day_number not in dark_set]
+            if active_days:
+                target_day = active_days[0]
+                for sc in evacuated_scenes:
+                    if not any(existing.scene_id == sc.scene_id for existing in target_day.scenes):
+                        target_day.scenes.append(sc)
+                target_day.total_duration_minutes = sum(s.est_shoot_minutes for s in target_day.scenes)
+                target_day.locations = sorted(list({s.location for s in target_day.scenes}))
+                target_day.company_moves = max(0, len(target_day.locations) - 1)
+
+        # Recalculate DOOD matrix with updated dark days and scheduled scenes
+        sched_dict = {d.day_number: d.scenes for d in STATE["current_solution"].days}
+        STATE["current_solution"].dood_matrix = calculate_dood_matrix(
+            STATE["actors"],
+            sched_dict,
+            len(STATE["current_solution"].days),
+            actor_blackouts=STATE.get("actor_blackouts", {}),
+            dark_days=STATE.get("dark_days", []),
+        )
+
         STATE["current_solution"].status = "PENDING_OPTIMIZATION"
         await event_bus.publish("schedule.optimized.solution", STATE["current_solution"].model_dump())
         return STATE["current_solution"]
@@ -728,11 +758,24 @@ async def update_production_plan(req: UpdatePlanRequest):
                 d.locations = sorted(list({s.location for s in d.scenes}))
                 d.company_moves = max(0, len(d.locations) - 1)
 
+        # 4b. Evacuate scenes from dark days and release locks
+        dark_set = set(STATE.get("dark_days", []))
+        for s in STATE["scenes"]:
+            if s.locked_day and s.locked_day in dark_set:
+                s.locked_day = None
+
+        evacuated_scenes = []
         for d in sol.days:
-            if d.day_number in STATE["dark_days"]:
+            if d.day_number in dark_set:
                 d.is_dark_day = True
                 if not d.dark_day_reason:
                     d.dark_day_reason = "Pre-planned Hiatus / Dark Day"
+                if d.scenes:
+                    evacuated_scenes.extend(d.scenes)
+                    d.scenes = []
+                    d.total_duration_minutes = 0
+                    d.locations = []
+                    d.company_moves = 0
             elif not any(a.disruption_type == "DAY_SHUTDOWN" and d.day_number in a.affected_shoot_days for a in STATE.get("active_disruptions", [])):
                 d.is_dark_day = False
                 d.dark_day_reason = None
@@ -740,6 +783,18 @@ async def update_production_plan(req: UpdatePlanRequest):
                 cal_date, disp_date = get_day_dates(ps.start_date, d.day_number)
                 d.calendar_date = cal_date
                 d.date_display = disp_date
+
+        if evacuated_scenes:
+            active_days = [d for d in sol.days if d.day_number not in dark_set]
+            if active_days:
+                target_day = active_days[0]
+                for sc in evacuated_scenes:
+                    if not any(existing.scene_id == sc.scene_id for existing in target_day.scenes):
+                        target_day.scenes.append(sc)
+                target_day.total_duration_minutes = sum(s.est_shoot_minutes for s in target_day.scenes)
+                target_day.locations = sorted(list({s.location for s in target_day.scenes}))
+                target_day.company_moves = max(0, len(target_day.locations) - 1)
+            sol.status = "PENDING_OPTIMIZATION"
 
         # Recalculate DOOD matrix with updated actors, blackouts, and dark days
         scheduled_dict = {d.day_number: d.scenes for d in sol.days}

@@ -401,6 +401,11 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
         updatedLocBlackouts[loc] = (bDays || []).filter((d) => d !== day);
       });
       setDraftLocationBlackouts(updatedLocBlackouts);
+
+      // Release any scene locks pinned to this dark day
+      setScenes((prev) =>
+        prev.map((s) => (s.locked_day === day ? { ...s, locked_day: null } : s))
+      );
     }
   };
 
@@ -625,12 +630,13 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                           <select
                             value={sc.setting}
                             onChange={(e) => handleUpdateScene(idx, 'setting', e.target.value)}
-                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 cursor-pointer shadow-sm"
+                            style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}
                           >
-                            <option value="INT_DAY">INT DAY</option>
-                            <option value="EXT_DAY">EXT DAY</option>
-                            <option value="INT_NIGHT">INT NIGHT</option>
-                            <option value="EXT_NIGHT">EXT NIGHT</option>
+                            <option value="INT_DAY" className="bg-slate-900 text-slate-100" style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}>INT DAY</option>
+                            <option value="EXT_DAY" className="bg-slate-900 text-slate-100" style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}>EXT DAY</option>
+                            <option value="INT_NIGHT" className="bg-slate-900 text-slate-100" style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}>INT NIGHT</option>
+                            <option value="EXT_NIGHT" className="bg-slate-900 text-slate-100" style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}>EXT NIGHT</option>
                           </select>
 
                           {/* Location */}
@@ -657,25 +663,44 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                           </div>
 
                           {/* Hard Pin to Day Lock */}
-                          <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded px-2 py-1">
+                          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 shadow-sm">
                             {sc.locked_day ? (
-                              <Lock className="w-3 h-3 text-amber-400" />
+                              <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                             ) : (
-                              <Unlock className="w-3 h-3 text-slate-500" />
+                              <Unlock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                             )}
                             <select
                               value={sc.locked_day || ''}
                               onChange={(e) =>
                                 handleUpdateScene(idx, 'locked_day', e.target.value ? Number(e.target.value) : null)
                               }
-                              className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
+                              className="bg-slate-900 text-xs font-semibold focus:outline-none cursor-pointer border-none py-0.5"
+                              style={{
+                                backgroundColor: '#0f172a',
+                                color: sc.locked_day ? '#fcd34d' : '#f1f5f9',
+                              }}
                             >
-                              <option value="">Flexible (Auto)</option>
+                              <option
+                                value=""
+                                className="bg-slate-900 text-slate-200 font-normal"
+                                style={{ backgroundColor: '#0f172a', color: '#cbd5e1' }}
+                              >
+                                Flexible (Auto-Schedule)
+                              </option>
                               {allDays.map((d) => {
                                 const isDark = draftDarkDays.includes(d);
                                 const dDate = getFormattedDate(draftStartDate, d);
                                 return (
-                                  <option key={d} value={d} disabled={isDark}>
+                                  <option
+                                    key={d}
+                                    value={d}
+                                    disabled={isDark}
+                                    className={isDark ? "bg-slate-950 text-slate-500 italic" : "bg-slate-900 text-slate-100 font-medium"}
+                                    style={{
+                                      backgroundColor: isDark ? '#020617' : '#0f172a',
+                                      color: isDark ? '#64748b' : '#f8fafc',
+                                    }}
+                                  >
                                     Lock Day {d}{dDate ? ` (${dDate})` : ''}{isDark ? ' — ⛔ DARK DAY (Hiatus)' : ''}
                                   </option>
                                 );
@@ -1118,6 +1143,19 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
               {/* Dark Days Grid */}
               <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                {/* Dark Day Film Policy Explainer */}
+                <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 flex items-start gap-2.5 shadow-sm">
+                  <Moon className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="font-bold text-indigo-300">
+                      What happens when you declare a Dark Day (Hiatus)?
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      In film production, a <strong>Dark Day</strong> is a mandatory full-company hiatus (e.g. SAG-AFTRA 7th-day rest, legal holiday, or travel day). <strong>Zero filming is scheduled</strong>. Any scenes currently on that day are automatically cleared, and their cast and locations are relieved from call. Hard day locks on that day are automatically released so CP-SAT can route those scenes to the best available shoot days.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between">
                   <div>
                     <h5 className="text-xs font-bold text-white uppercase tracking-wider">
