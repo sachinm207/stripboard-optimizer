@@ -43,6 +43,8 @@ export interface DaySchedule {
   is_day: boolean;
   is_dark_day?: boolean;
   dark_day_reason?: string;
+  calendar_date?: string;
+  date_display?: string;
 }
 
 export interface ActorDOODRow {
@@ -77,6 +79,7 @@ export interface ScheduleSolution {
   solution_id: string;
   production_id: string;
   status: string;
+  start_date?: string;
   days: DaySchedule[];
   dood_matrix: ActorDOODRow[];
   metrics: ScheduleMetrics;

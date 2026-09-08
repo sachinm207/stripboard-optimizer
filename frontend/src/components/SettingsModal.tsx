@@ -18,6 +18,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [turnaroundPenalty, setTurnaroundPenalty] = useState(25000);
   const [permitLeadDays, setPermitLeadDays] = useState(0);
   const [maxMinutesPerDay, setMaxMinutesPerDay] = useState(600);
+  const [startDate, setStartDate] = useState('2026-10-12');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -28,6 +29,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           setTurnaroundPenalty(s.w_turnaround);
           setPermitLeadDays(s.permit_lead_days);
           setMaxMinutesPerDay(s.max_minutes_per_day);
+          if (s.start_date) {
+            setStartDate(s.start_date);
+          }
         })
         .catch(console.error)
         .finally(() => setLoading(false));
@@ -43,6 +47,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         w_turnaround: turnaroundPenalty,
         permit_lead_days: permitLeadDays,
         max_minutes_per_day: maxMinutesPerDay,
+        start_date: startDate,
       });
       onSaved(res);
       onClose();
@@ -63,7 +68,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div>
               <h3 className="font-bold text-base text-white">Production Policy & Union Rules</h3>
               <p className="text-xs text-slate-400">
-                Configure labor penalties, municipal permit windows, and work hour caps
+                Configure labor penalties, calendar start date, and work hour caps
               </p>
             </div>
           </div>
@@ -78,6 +83,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSave} className="p-6 space-y-5">
+          {/* Principal Photography Start Date */}
+          <div className="border-b border-slate-800 pb-4">
+            <label className="block text-xs font-bold text-white mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-purple-400" />
+                Principal Photography Start Date (Day 1)
+              </span>
+              <span className="text-purple-300 font-mono font-bold text-xs">{startDate}</span>
+            </label>
+            <p className="text-[11px] text-slate-400 mb-2">
+              Industry standard calendar anchor for Day 1 call. All subsequent days, hiatuses, and call sheets automatically sync to this date.
+            </p>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono cursor-pointer"
+            />
+          </div>
+
           {/* SAG Penalty Input */}
           <div>
             <label className="block text-xs font-bold text-white mb-1 flex items-center justify-between">

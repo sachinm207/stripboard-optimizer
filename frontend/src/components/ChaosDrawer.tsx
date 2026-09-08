@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Flame, AlertTriangle, ShieldAlert, CloudRain, Ban, Activity, Plus, Trash2, Zap, Moon } from 'lucide-react';
-import { DisruptionAlert, Actor, Scene } from '../types';
+import { DisruptionAlert, Actor, Scene, DaySchedule } from '../types';
 
 interface ChaosDrawerProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface ChaosDrawerProps {
   actors: Actor[];
   scenes: Scene[];
   numDays?: number;
+  days?: DaySchedule[];
   onSolve?: () => void;
   isSolving?: boolean;
 }
@@ -26,6 +27,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
   actors,
   scenes,
   numDays = 5,
+  days = [],
   onSolve,
   isSolving = false,
 }) => {
@@ -269,11 +271,15 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                 onChange={(e) => setShutdownDay(Number(e.target.value))}
                 className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-rose-500 cursor-pointer"
               >
-                {daysList.map((d) => (
-                  <option key={d} value={d}>
-                    Day {d} of {daysList.length} (Shoot Call)
-                  </option>
-                ))}
+                {daysList.map((d) => {
+                  const daySchedule = days.find((day) => day.day_number === d);
+                  const dateStr = daySchedule?.date_display ? ` (${daySchedule.date_display})` : '';
+                  return (
+                    <option key={d} value={d}>
+                      Day {d}{dateStr} of {daysList.length} (Shoot Call)
+                    </option>
+                  );
+                })}
               </select>
               {daysList.length <= 8 && (
                 <div className="flex items-center gap-1">
@@ -425,31 +431,38 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
                       </option>
                       {daysList
                         .filter((d) => !selectedDays.includes(d))
-                        .map((d) => (
-                          <option key={d} value={d}>
-                            Day {d}
-                          </option>
-                        ))}
+                        .map((d) => {
+                          const daySchedule = days.find((day) => day.day_number === d);
+                          const dateStr = daySchedule?.date_display ? ` (${daySchedule.date_display})` : '';
+                          return (
+                            <option key={d} value={d}>
+                              Day {d}{dateStr}
+                            </option>
+                          );
+                        })}
                     </select>
                   </div>
 
                   {selectedDays.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-950/60 rounded-lg border border-slate-800">
-                      {selectedDays.map((d) => (
-                        <span
-                          key={d}
-                          className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1"
-                        >
-                          <span>Day {d}</span>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDays(selectedDays.filter((x) => x !== d))}
-                            className="hover:text-white cursor-pointer ml-0.5"
+                      {selectedDays.map((d) => {
+                        const daySchedule = days.find((day) => day.day_number === d);
+                        return (
+                          <span
+                            key={d}
+                            className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1"
                           >
-                            ×
-                          </button>
-                        </span>
-                      ))}
+                            <span>Day {d}{daySchedule?.date_display ? ` (${daySchedule.date_display})` : ''}</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDays(selectedDays.filter((x) => x !== d))}
+                              className="hover:text-white cursor-pointer ml-0.5"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-[10px] text-slate-500 italic">Select one or more days from the dropdown.</p>

@@ -197,6 +197,9 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLoc
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-sm text-white flex items-center gap-1.5">
                         <span>DAY {day.day_number}</span>
+                        {day.date_display && (
+                          <span className="text-indigo-300/80 font-medium text-xs">• {day.date_display}</span>
+                        )}
                       </h3>
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1">
                         <Moon className="w-3 h-3" /> Scheduled Hiatus / Dark Day
@@ -231,6 +234,9 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLoc
                     <div>
                       <h3 className="font-bold text-sm text-white flex items-center gap-1.5 leading-none">
                         <span>DAY {day.day_number}</span>
+                        {day.date_display && (
+                          <span className="text-slate-400 font-medium text-xs">• {day.date_display}</span>
+                        )}
                       </h3>
                       <div className="flex items-center gap-1.5 mt-1">
                         {day.is_night && (

@@ -1,6 +1,7 @@
 import time
 import uuid
-from typing import List, Dict, Optional
+import datetime
+from typing import List, Dict, Optional, Tuple
 from ortools.sat.python import cp_model
 from backend.app.models.scene import Scene, SceneSetting
 from backend.app.models.actor import Actor
@@ -11,6 +12,16 @@ from backend.app.models.schedule import (
     ScheduleSolution
 )
 from backend.app.solver.dood_calculator import calculate_dood_matrix
+
+def get_day_dates(start_date_str: Optional[str], day_number: int) -> Tuple[str, str]:
+    try:
+        dt = datetime.date.fromisoformat(start_date_str) if start_date_str else datetime.date(2026, 10, 12)
+    except Exception:
+        dt = datetime.date(2026, 10, 12)
+    current_dt = dt + datetime.timedelta(days=day_number - 1)
+    calendar_date = current_dt.strftime("%Y-%m-%d")
+    date_display = current_dt.strftime("%a, %b %d")
+    return calendar_date, date_display
 
 class StripboardSolver:
     def __init__(
@@ -23,7 +34,8 @@ class StripboardSolver:
         w_move: int = 15000,
         w_turnaround: int = 25000,
         permit_lead_days: int = 0,
-        current_day_offset: int = 1
+        current_day_offset: int = 1,
+        start_date: Optional[str] = "2026-10-12"
     ):
         self.scenes = scenes
         self.actors = actors
@@ -34,6 +46,7 @@ class StripboardSolver:
         self.w_turnaround = w_turnaround
         self.permit_lead_days = permit_lead_days
         self.current_day_offset = current_day_offset
+        self.start_date = start_date or "2026-10-12"
 
     def solve(
         self,
@@ -306,6 +319,7 @@ class StripboardSolver:
                 has_night = any("NIGHT" in sc.setting.value for sc in scenes_on_day)
                 has_day = any("DAY" in sc.setting.value for sc in scenes_on_day)
                 is_dark = (d in shutdown_days)
+                cal_date, disp_date = get_day_dates(self.start_date, d)
 
                 day_schedules.append(
                     DaySchedule(
@@ -318,6 +332,8 @@ class StripboardSolver:
                         is_day=has_day,
                         is_dark_day=is_dark,
                         dark_day_reason=shutdown_reasons.get(d) if is_dark else None,
+                        calendar_date=cal_date,
+                        date_display=disp_date,
                     )
                 )
 
@@ -360,6 +376,7 @@ class StripboardSolver:
                 solution_id=f"sol_{uuid.uuid4().hex[:8]}",
                 production_id="prod_neon_horizon",
                 status=status_str,
+                start_date=self.start_date,
                 days=day_schedules,
                 dood_matrix=dood_rows,
                 metrics=metrics,
@@ -410,6 +427,7 @@ class StripboardSolver:
                 solution_id=f"sol_{uuid.uuid4().hex[:8]}",
                 production_id="prod_neon_horizon",
                 status="INFEASIBLE",
+                start_date=self.start_date,
                 days=[],
                 dood_matrix=[],
                 metrics=ScheduleMetrics(solver_runtime_ms=runtime_ms),
@@ -424,7 +442,8 @@ def generate_naive_schedule(
     max_minutes_per_day: int = 600,
     w_hold: int = 2000,
     w_move: int = 15000,
-    w_turnaround: int = 25000
+    w_turnaround: int = 25000,
+    start_date: Optional[str] = "2026-10-12"
 ) -> ScheduleSolution:
     """
     Generates a raw, unoptimized schedule packing scenes in sequential script order.
@@ -451,6 +470,7 @@ def generate_naive_schedule(
         total_moves += day_moves
         has_night = any("NIGHT" in sc.setting.value for sc in scs)
         has_day = any("DAY" in sc.setting.value for sc in scs)
+        cal_date, disp_date = get_day_dates(start_date, d)
 
         day_schedules.append(
             DaySchedule(
@@ -461,6 +481,8 @@ def generate_naive_schedule(
                 company_moves=day_moves,
                 is_night=has_night,
                 is_day=has_day,
+                calendar_date=cal_date,
+                date_display=disp_date,
             )
         )
 
@@ -488,6 +510,7 @@ def generate_naive_schedule(
         solution_id=f"naive_{uuid.uuid4().hex[:8]}",
         production_id="prod_raw_unoptimized",
         status="RAW_UNOPTIMIZED",
+        start_date=start_date or "2026-10-12",
         days=day_schedules,
         dood_matrix=dood_rows,
         metrics=metrics,

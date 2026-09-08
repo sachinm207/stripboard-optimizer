@@ -100,7 +100,7 @@ Write in a sharp, authentic, professional film industry voice. Use Markdown form
 
 **TO:** Studio Production Executive, 1st Assistant Director, Key Department Heads  
 **FROM:** Autonomous Stripboard Optimizer (OR-Tools CP-SAT + Gemini 2.5 Multi-Agent Mesh)  
-**PRODUCTION:** {solution.production_id.upper()}  
+**PRODUCTION:** {(solution.production_id or "NEON_HORIZON").upper()}  
 **STATUS:** {solution.status} (Re-optimized in {metrics.solver_runtime_ms} ms)  
 
 ---

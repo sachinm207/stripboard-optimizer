@@ -163,6 +163,7 @@ export async function fetchProductionSettings(): Promise<{
   permit_lead_days: number;
   max_minutes_per_day: number;
   num_days: number;
+  start_date?: string;
 }> {
   const res = await fetch(`${API_BASE}/production/settings`);
   if (!res.ok) throw new Error('Failed to fetch settings');
@@ -173,6 +174,7 @@ export async function updateProductionSettings(settings: {
   w_turnaround?: number;
   permit_lead_days?: number;
   max_minutes_per_day?: number;
+  start_date?: string;
 }): Promise<ScheduleSolution> {
   const res = await fetch(`${API_BASE}/production/settings`, {
     method: 'POST',

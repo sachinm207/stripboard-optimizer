@@ -19,7 +19,7 @@ from backend.app.models.version import (
     CreateVersionRequest,
     DiffVersionsRequest
 )
-from backend.app.solver.cp_sat_model import StripboardSolver, generate_naive_schedule
+from backend.app.solver.cp_sat_model import StripboardSolver, generate_naive_schedule, get_day_dates
 from backend.app.solver.dood_calculator import calculate_dood_matrix
 from backend.app.solver.version_diff import compute_constraint_diff
 from backend.app.kafka.bus import event_bus, ALL_TOPICS
@@ -32,6 +32,7 @@ from contextlib import asynccontextmanager
 STATE = {
     "production_id": None,
     "title": None,
+    "start_date": "2026-10-12",
     "scenes": [],
     "actors": [],
     "num_days": 5,
@@ -85,7 +86,8 @@ def run_solver(disruptions=None, naive_cost=None) -> ScheduleSolution:
         w_hold=STATE.get("w_hold", 2000),
         w_move=STATE.get("w_move", 15000),
         w_turnaround=STATE["w_turnaround"],
-        permit_lead_days=STATE["permit_lead_days"]
+        permit_lead_days=STATE["permit_lead_days"],
+        start_date=STATE.get("start_date", "2026-10-12")
     )
     solution = solver.solve(
         disruptions=disruptions,
@@ -95,7 +97,7 @@ def run_solver(disruptions=None, naive_cost=None) -> ScheduleSolution:
         dark_days=STATE.get("dark_days", []),
         soft_locks=STATE.get("soft_locks", {})
     )
-    solution.production_id = STATE.get("production_id", "prod_neon_horizon")
+    solution.production_id = STATE.get("production_id") or "prod_neon_horizon"
     return solution
 
 memo_agent = ExecutiveMemoAgent()
@@ -108,6 +110,7 @@ def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = 
             data = json.load(f)
             STATE["production_id"] = data.get("production_id", "prod_neon_horizon")
             STATE["title"] = data.get("title", "Neon Horizon")
+            STATE["start_date"] = data.get("start_date", "2026-10-12")
             STATE["scenes"] = [Scene(**s) for s in data["scenes"]]
             STATE["actors"] = [Actor(**a) for a in data["actors"]]
             STATE["num_days"] = data.get("num_days", 5)
@@ -122,7 +125,8 @@ def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = 
         max_minutes_per_day=STATE["max_minutes_per_day"],
         w_hold=STATE["w_hold"],
         w_move=STATE["w_move"],
-        w_turnaround=STATE["w_turnaround"]
+        w_turnaround=STATE["w_turnaround"],
+        start_date=STATE.get("start_date", "2026-10-12")
     )
     naive_solution.production_id = STATE["production_id"]
     STATE["naive_cost"] = naive_solution.metrics.objective_cost
@@ -136,7 +140,8 @@ def load_seed_data(preset_filename: str = "neon_horizon.json", optimize: bool = 
             num_days=STATE["num_days"],
             max_minutes_per_day=STATE["max_minutes_per_day"],
             w_turnaround=STATE["w_turnaround"],
-            permit_lead_days=STATE["permit_lead_days"]
+            permit_lead_days=STATE["permit_lead_days"],
+            start_date=STATE.get("start_date", "2026-10-12")
         )
         solution = solver.solve(disruptions=[], naive_cost=STATE["naive_cost"])
         solution.production_id = STATE["production_id"]
@@ -479,6 +484,9 @@ async def move_scene_to_day(req: MoveSceneRequest):
         total_moves += day_moves
         has_night = any("NIGHT" in sc.setting.value for sc in scs)
         has_day = any("DAY" in sc.setting.value for sc in scs)
+        cal_date, disp_date = get_day_dates(STATE.get("start_date", "2026-10-12"), d)
+        is_dark = (d in STATE.get("dark_days", [])) or any(a.disruption_type == "DAY_SHUTDOWN" and d in a.affected_shoot_days for a in STATE.get("active_disruptions", []))
+
         day_schedules.append(
             DaySchedule(
                 day_number=d,
@@ -488,6 +496,9 @@ async def move_scene_to_day(req: MoveSceneRequest):
                 company_moves=day_moves,
                 is_night=has_night,
                 is_day=has_day,
+                is_dark_day=is_dark,
+                calendar_date=cal_date,
+                date_display=disp_date,
             )
         )
 
@@ -536,6 +547,7 @@ class SettingsUpdateRequest(BaseModel):
     w_turnaround: Optional[int] = None
     permit_lead_days: Optional[int] = None
     max_minutes_per_day: Optional[int] = None
+    start_date: Optional[str] = None
 
 @app.get("/api/production/settings")
 def get_production_settings():
@@ -544,6 +556,7 @@ def get_production_settings():
         "permit_lead_days": STATE["permit_lead_days"],
         "max_minutes_per_day": STATE["max_minutes_per_day"],
         "num_days": STATE["num_days"],
+        "start_date": STATE.get("start_date", "2026-10-12"),
     }
 
 @app.post("/api/production/settings", response_model=ScheduleSolution)
@@ -555,6 +568,14 @@ async def update_production_settings(req: SettingsUpdateRequest):
         STATE["permit_lead_days"] = req.permit_lead_days
     if req.max_minutes_per_day is not None:
         STATE["max_minutes_per_day"] = req.max_minutes_per_day
+    if req.start_date is not None:
+        STATE["start_date"] = req.start_date
+        if STATE.get("current_solution"):
+            STATE["current_solution"].start_date = req.start_date
+            for d in STATE["current_solution"].days:
+                cal_date, disp_date = get_day_dates(req.start_date, d.day_number)
+                d.calendar_date = cal_date
+                d.date_display = disp_date
 
     if STATE.get("current_solution"):
         STATE["current_solution"].status = "PENDING_OPTIMIZATION"

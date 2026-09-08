@@ -906,6 +906,7 @@ export const App: React.FC = () => {
         actors={actors}
         scenes={scenes}
         numDays={solution?.days.length || 5}
+        days={solution?.days || []}
         onSolve={handleSolveSchedule}
         isSolving={isSolving}
       />

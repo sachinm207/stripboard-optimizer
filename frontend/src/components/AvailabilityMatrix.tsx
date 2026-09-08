@@ -436,25 +436,30 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
-              {(isEditingDarkDays ? draftDarkDays : darkDays).map((d) => (
-                <div
-                  key={d}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-950 border border-indigo-600 text-indigo-200 text-xs font-bold shadow-sm"
-                >
-                  <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Day {d}: Hiatus / Dark Day</span>
-                  {isEditingDarkDays && (
-                    <button
-                      type="button"
-                      onClick={() => handleToggleDraftDarkDay(d)}
-                      className="p-0.5 rounded hover:bg-indigo-900 text-indigo-400 hover:text-rose-400 transition-colors cursor-pointer"
-                      title={`Remove Day ${d} from dark days`}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              ))}
+              {(isEditingDarkDays ? draftDarkDays : darkDays).map((d) => {
+                const daySchedule = days.find((day) => day.day_number === d);
+                return (
+                  <div
+                    key={d}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-950 border border-indigo-600 text-indigo-200 text-xs font-bold shadow-sm"
+                  >
+                    <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>
+                      Day {d}{daySchedule?.date_display ? ` • ${daySchedule.date_display}` : ''}: Hiatus / Dark Day
+                    </span>
+                    {isEditingDarkDays && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleDraftDarkDay(d)}
+                        className="p-0.5 rounded hover:bg-indigo-900 text-indigo-400 hover:text-rose-400 transition-colors cursor-pointer"
+                        title={`Remove Day ${d} from dark days`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -473,11 +478,15 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                 >
                   {daysHeader
                     .filter((d) => !draftDarkDays.includes(d))
-                    .map((d) => (
-                      <option key={d} value={d}>
-                        Day {d} of {numDays} (Shoot Call)
-                      </option>
-                    ))}
+                    .map((d) => {
+                      const daySchedule = days.find((day) => day.day_number === d);
+                      const dateStr = daySchedule?.date_display ? ` (${daySchedule.date_display})` : '';
+                      return (
+                        <option key={d} value={d}>
+                          Day {d}{dateStr} of {numDays} (Shoot Call)
+                        </option>
+                      );
+                    })}
                 </select>
                 <button
                   type="button"
@@ -760,12 +769,18 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                 </th>
                 {visibleDays.map((d) => {
                   const dayDark = isDayDark(d);
+                  const daySchedule = days.find((day) => day.day_number === d);
                   return (
                     <th key={d} className="py-2.5 px-2 text-center min-w-[72px]">
-                      <div className="flex flex-col items-center gap-1">
+                      <div className="flex flex-col items-center gap-0.5">
                         <span className={`font-mono text-xs ${dayDark ? 'text-indigo-400 font-bold' : 'text-slate-300'}`}>
-                          Day {d}
+                          D{d}
                         </span>
+                        {daySchedule?.date_display && (
+                          <span className="text-[10px] text-slate-400 font-mono leading-tight whitespace-nowrap">
+                            {daySchedule.date_display.split(', ')[1] || daySchedule.date_display}
+                          </span>
+                        )}
                         {dayDark && (
                           <span className="px-1.5 py-0.2 rounded bg-indigo-950 border border-indigo-800 text-indigo-300 text-[9px] font-bold">
                             Hiatus
@@ -895,12 +910,18 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                 </th>
                 {visibleDays.map((d) => {
                   const dayDark = isDayDark(d);
+                  const daySchedule = days.find((day) => day.day_number === d);
                   return (
                     <th key={d} className="py-2.5 px-2 text-center min-w-[80px]">
-                      <div className="flex flex-col items-center gap-1">
+                      <div className="flex flex-col items-center gap-0.5">
                         <span className={`font-mono text-xs ${dayDark ? 'text-indigo-400 font-bold' : 'text-slate-300'}`}>
-                          Day {d}
+                          D{d}
                         </span>
+                        {daySchedule?.date_display && (
+                          <span className="text-[10px] text-slate-400 font-mono leading-tight whitespace-nowrap">
+                            {daySchedule.date_display.split(', ')[1] || daySchedule.date_display}
+                          </span>
+                        )}
                         {dayDark && (
                           <span className="px-1.5 py-0.2 rounded bg-indigo-950 border border-indigo-800 text-indigo-300 text-[9px] font-bold">
                             Hiatus

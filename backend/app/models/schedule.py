@@ -13,6 +13,8 @@ class DaySchedule(BaseModel):
     is_day: bool = False
     is_dark_day: bool = False
     dark_day_reason: Optional[str] = None
+    calendar_date: Optional[str] = None
+    date_display: Optional[str] = None
 
 class ActorDOODRow(BaseModel):
     actor_id: str
@@ -37,6 +39,7 @@ class ScheduleSolution(BaseModel):
     solution_id: str
     production_id: str = "prod_neon_horizon"
     status: str
+    start_date: Optional[str] = "2026-10-12"
     days: List[DaySchedule] = Field(default_factory=list)
     dood_matrix: List[ActorDOODRow] = Field(default_factory=list)
     metrics: ScheduleMetrics = Field(default_factory=ScheduleMetrics)
