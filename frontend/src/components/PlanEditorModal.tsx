@@ -15,6 +15,7 @@ import {
   DollarSign,
   Plus,
   Trash2,
+  Moon,
 } from 'lucide-react';
 import { Scene, Actor, DaySchedule, ScheduleSolution, ActorDOODRow } from '../types';
 import { updateProductionPlan, fetchProductionSettings, fetchScenes, fetchActors, fetchConstraints } from '../services/api';
@@ -242,6 +243,19 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
 
   const totalDays = Math.max(numDays || 5, (days || []).length, 5);
   const allDays = Array.from({ length: totalDays }, (_, i) => i + 1);
+
+  // Dynamic calendar date helper
+  const getFormattedDate = (baseDateStr: string, dayNumber: number): string => {
+    try {
+      const base = new Date(baseDateStr + 'T00:00:00');
+      if (isNaN(base.getTime())) return '';
+      const d = new Date(base);
+      d.setDate(base.getDate() + (dayNumber - 1));
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    } catch {
+      return '';
+    }
+  };
 
   // Scene editing helpers
   const handleUpdateScene = (idx: number, field: keyof Scene, value: any) => {
@@ -501,13 +515,23 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                 {scenes.map((sc, idx) => {
                   const scheduledDay = sceneScheduledDayMap.get(sc.scene_id);
+                  const isScheduledOnDark = scheduledDay && draftDarkDays.includes(scheduledDay.day_number);
+                  const talentBlackoutConflicts = scheduledDay
+                    ? (sc.cast_ids || [])
+                        .filter((actId) => ((draftActorBlackouts[actId] || []).includes(scheduledDay.day_number)))
+                        .map((actId) => actors.find((a) => a.actor_id === actId)?.name || actId)
+                    : [];
+                  const isLocationBlackoutConflict = scheduledDay
+                    ? (draftLocationBlackouts[sc.location] || []).includes(scheduledDay.day_number)
+                    : false;
+
                   return (
                     <div
                       key={sc.scene_id}
                       className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition-all space-y-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono font-bold text-xs">
                             Scene {sc.scene_number}
                           </span>
@@ -517,11 +541,36 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                             onChange={(e) => handleUpdateScene(idx, 'slugline', e.target.value)}
                             className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white font-semibold focus:outline-none focus:border-indigo-500 min-w-[280px]"
                           />
-                          {/* Live Scheduled Day Tag */}
-                          {scheduledDay && (
+                          {/* Live Scheduled Day Tag & Conflict Badges */}
+                          {isScheduledOnDark ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 border border-rose-500/40 text-rose-300 flex items-center gap-1">
+                              <Moon className="w-3 h-3 text-rose-400" />
+                              <span>⛔ Scheduled on Dark Day {scheduledDay.day_number} (Hiatus)</span>
+                            </span>
+                          ) : scheduledDay ? (
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                              <span>Board: Day {scheduledDay.day_number}{scheduledDay.date_display ? ` (${scheduledDay.date_display})` : ''}</span>
+                              <span>Board: Day {scheduledDay.day_number} ({getFormattedDate(draftStartDate, scheduledDay.day_number)})</span>
+                            </span>
+                          ) : null}
+
+                          {talentBlackoutConflicts.length > 0 && (
+                            <span
+                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center gap-1"
+                              title={`Talent blackout: ${talentBlackoutConflicts.join(', ')} cannot film on Day ${scheduledDay?.day_number}`}
+                            >
+                              <AlertCircle className="w-3 h-3 text-amber-400" />
+                              <span>Cast Blackout: {talentBlackoutConflicts.join(', ')}</span>
+                            </span>
+                          )}
+
+                          {isLocationBlackoutConflict && (
+                            <span
+                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 border border-sky-500/40 text-sky-300 flex items-center gap-1"
+                              title={`Location permit blackout: ${sc.location} unavailable on Day ${scheduledDay?.day_number}`}
+                            >
+                              <MapPin className="w-3 h-3 text-sky-400" />
+                              <span>Permit Blackout: {sc.location}</span>
                             </span>
                           )}
                         </div>
@@ -577,11 +626,15 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                               className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
                             >
                               <option value="">Flexible (Auto)</option>
-                              {allDays.map((d) => (
-                                <option key={d} value={d}>
-                                  Lock Day {d}
-                                </option>
-                              ))}
+                              {allDays.map((d) => {
+                                const isDark = draftDarkDays.includes(d);
+                                const dDate = getFormattedDate(draftStartDate, d);
+                                return (
+                                  <option key={d} value={d} disabled={isDark}>
+                                    Lock Day {d}{dDate ? ` (${dDate})` : ''}{isDark ? ' — ⛔ DARK DAY (Hiatus)' : ''}
+                                  </option>
+                                );
+                              })}
                             </select>
                           </div>
 
@@ -602,18 +655,26 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                         <span className="text-[11px] text-slate-400 mr-1">Cast Required:</span>
                         {actors.map((act) => {
                           const isCast = (sc.cast_ids || []).includes(act.actor_id);
+                          const isConflictOnDay = isCast && scheduledDay && (draftActorBlackouts[act.actor_id] || []).includes(scheduledDay.day_number);
                           return (
                             <button
                               key={act.actor_id}
                               type="button"
                               onClick={() => handleToggleSceneCast(idx, act.actor_id)}
                               className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                                isCast
+                                isConflictOnDay
+                                  ? 'bg-rose-950/80 border border-rose-500 text-rose-300 font-bold'
+                                  : isCast
                                   ? 'bg-purple-600/30 border border-purple-500/50 text-purple-300'
                                   : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-slate-300'
                               }`}
+                              title={
+                                isConflictOnDay
+                                  ? `⚠️ ${act.name} has a contractual blackout on Day ${scheduledDay.day_number}!`
+                                  : act.name
+                              }
                             >
-                              {act.name}
+                              {act.name} {isConflictOnDay && '⚠️'}
                             </button>
                           );
                         })}
@@ -645,6 +706,24 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                   <Plus className="w-3.5 h-3.5 text-purple-300" />
                   <span>+ Add Cast Member</span>
                 </button>
+              </div>
+
+              {/* Hiatus & Calendar Integration Notice */}
+              <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-800/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 text-indigo-200">
+                  <Calendar className="w-4 h-4 text-purple-400 shrink-0" />
+                  <span>
+                    Calendar Start: <strong className="text-white font-mono">{draftStartDate}</strong> ({getFormattedDate(draftStartDate, 1)})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-indigo-300">
+                  <Moon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span>
+                    {draftDarkDays.length > 0
+                      ? `${draftDarkDays.length} Production Dark Day(s) Scheduled (Days ${draftDarkDays.join(', ')})`
+                      : 'No production dark days configured'}
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
@@ -724,35 +803,58 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Day Grid Picker */}
-                      <div>
-                        <div className="text-[11px] text-slate-400 font-medium mb-1.5">
+                      {/* Day Grid Picker with Dark Day & Calendar Integration */}
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] text-slate-400 font-medium">
                           Toggle Contract Blackout Days (Day 1 - {totalDays}):
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5">
                           {allDays.map((d) => {
+                            const isDark = draftDarkDays.includes(d);
                             const isBlackout = blackouts.includes(d);
-                            const daySched = days.find((day) => day.day_number === d);
+                            const dateStr = getFormattedDate(draftStartDate, d);
                             return (
                               <button
                                 key={d}
                                 type="button"
                                 onClick={() => handleToggleActorBlackout(act.actor_id, d)}
-                                className={`w-8 h-7 rounded border text-[11px] font-bold transition-all cursor-pointer ${
+                                className={`min-w-[34px] h-8 px-1 rounded border text-[11px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center ${
                                   isBlackout
-                                    ? 'bg-rose-600 text-white border-rose-500 shadow-sm shadow-rose-900/40'
+                                    ? 'bg-rose-600 text-white border-rose-500 shadow-sm shadow-rose-900/40 ring-1 ring-rose-400'
+                                    : isDark
+                                    ? 'bg-indigo-950/80 text-indigo-300 border-indigo-700/80 hover:border-indigo-500'
                                     : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
                                 }`}
                                 title={
-                                  isBlackout
-                                    ? `Day ${d}${daySched?.date_display ? ` (${daySched.date_display})` : ''}: Contract Blackout`
-                                    : `Day ${d}${daySched?.date_display ? ` (${daySched.date_display})` : ''}: Available`
+                                  isBlackout && isDark
+                                    ? `Day ${d} (${dateStr}): Contract Blackout & Production Dark Day`
+                                    : isBlackout
+                                    ? `Day ${d} (${dateStr}): Contract Blackout (Actor Off)`
+                                    : isDark
+                                    ? `Day ${d} (${dateStr}): Production Hiatus / Dark Day (Set Closed)`
+                                    : `Day ${d} (${dateStr}): Available for Call`
                                 }
                               >
-                                {d}
+                                <span className="leading-tight">{d}</span>
+                                {isDark && (
+                                  <span className="text-[7.5px] uppercase font-mono tracking-tighter text-indigo-400 font-extrabold leading-none">
+                                    DARK
+                                  </span>
+                                )}
                               </button>
                             );
                           })}
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] text-slate-500 pt-0.5">
+                          <span className="flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-sm bg-rose-600 inline-block" /> Contract Blackout
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-sm bg-indigo-950 border border-indigo-700 inline-block" /> Production Dark Day (Hiatus)
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-sm bg-slate-900 border border-slate-800 inline-block" /> Available
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -800,6 +902,24 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                 </div>
               </div>
 
+              {/* Hiatus & Calendar Integration Notice */}
+              <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-800/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 text-indigo-200">
+                  <Calendar className="w-4 h-4 text-sky-400 shrink-0" />
+                  <span>
+                    Calendar Start: <strong className="text-white font-mono">{draftStartDate}</strong> ({getFormattedDate(draftStartDate, 1)})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-indigo-300">
+                  <Moon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span>
+                    {draftDarkDays.length > 0
+                      ? `${draftDarkDays.length} Production Dark Day(s) Scheduled (Days ${draftDarkDays.join(', ')})`
+                      : 'No production dark days configured'}
+                  </span>
+                </div>
+              </div>
+
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                 {locations.map((loc) => {
                   const blackouts = (draftLocationBlackouts && draftLocationBlackouts[loc]) || [];
@@ -833,35 +953,58 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Day Grid Picker */}
-                      <div>
-                        <div className="text-[11px] text-slate-400 font-medium mb-1.5">
+                      {/* Day Grid Picker with Dark Day & Calendar Integration */}
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] text-slate-400 font-medium">
                           Toggle Location Blackout Days (Day 1 - {totalDays}):
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5">
                           {allDays.map((d) => {
+                            const isDark = draftDarkDays.includes(d);
                             const isBlackout = blackouts.includes(d);
-                            const daySched = days.find((day) => day.day_number === d);
+                            const dateStr = getFormattedDate(draftStartDate, d);
                             return (
                               <button
                                 key={d}
                                 type="button"
                                 onClick={() => handleToggleLocationBlackout(loc, d)}
-                                className={`w-8 h-7 rounded border text-[11px] font-bold transition-all cursor-pointer ${
+                                className={`min-w-[34px] h-8 px-1 rounded border text-[11px] font-bold transition-all cursor-pointer flex flex-col items-center justify-center ${
                                   isBlackout
-                                    ? 'bg-sky-600 text-white border-sky-500 shadow-sm shadow-sky-900/40'
+                                    ? 'bg-sky-600 text-white border-sky-500 shadow-sm shadow-sky-900/40 ring-1 ring-sky-400'
+                                    : isDark
+                                    ? 'bg-indigo-950/80 text-indigo-300 border-indigo-700/80 hover:border-indigo-500'
                                     : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
                                 }`}
                                 title={
-                                  isBlackout
-                                    ? `Day ${d}${daySched?.date_display ? ` (${daySched.date_display})` : ''}: Location Unavailable`
-                                    : `Day ${d}${daySched?.date_display ? ` (${daySched.date_display})` : ''}: Permitted`
+                                  isBlackout && isDark
+                                    ? `Day ${d} (${dateStr}): Permit Blackout & Production Dark Day`
+                                    : isBlackout
+                                    ? `Day ${d} (${dateStr}): Permit Blackout (Location Closed)`
+                                    : isDark
+                                    ? `Day ${d} (${dateStr}): Production Hiatus / Dark Day (No Filming Permitted)`
+                                    : `Day ${d} (${dateStr}): Filming Permitted`
                                 }
                               >
-                                {d}
+                                <span className="leading-tight">{d}</span>
+                                {isDark && (
+                                  <span className="text-[7.5px] uppercase font-mono tracking-tighter text-indigo-400 font-extrabold leading-none">
+                                    DARK
+                                  </span>
+                                )}
                               </button>
                             );
                           })}
+                        </div>
+                        <div className="flex items-center gap-3 text-[10px] text-slate-500 pt-0.5">
+                          <span className="flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-sm bg-sky-600 inline-block" /> Municipal Permit Blackout
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-sm bg-indigo-950 border border-indigo-700 inline-block" /> Production Dark Day (Hiatus)
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-2.5 h-2.5 rounded-sm bg-slate-900 border border-slate-800 inline-block" /> Filming Permitted
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -949,23 +1092,41 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                 <div className="flex flex-wrap items-center gap-1.5">
                   {allDays.map((d) => {
                     const isDark = draftDarkDays.includes(d);
-                    const daySched = days.find((day) => day.day_number === d);
+                    const dateStr = getFormattedDate(draftStartDate, d);
                     return (
                       <button
                         key={d}
                         type="button"
                         onClick={() => handleToggleDarkDay(d)}
-                        className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                           isDark
-                            ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-950/50'
+                            ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-950/50 ring-1 ring-indigo-300'
                             : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
                         }`}
-                        title={isDark ? `Day ${d}: Scheduled Hiatus` : `Day ${d}: Shooting Day`}
+                        title={isDark ? `Day ${d} (${dateStr}): Scheduled Hiatus (Dark Day)` : `Day ${d} (${dateStr}): Shooting Day`}
                       >
-                        Day {d}{daySched?.date_display ? ` (${daySched.date_display})` : ''}
+                        <Moon className={`w-3 h-3 ${isDark ? 'text-white' : 'text-slate-600'}`} />
+                        <span>Day {d}</span>
+                        {dateStr && <span className={`text-[10px] font-normal ${isDark ? 'text-indigo-200' : 'text-slate-500'}`}>• {dateStr}</span>}
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Cross-Tab Sync Summary */}
+                <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                  <span className="flex items-center gap-1 text-purple-300">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>{actors.filter((a) => ((draftActorBlackouts && draftActorBlackouts[a.actor_id]) || []).length > 0).length} Cast Members with Contract Blackouts</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-sky-300">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>{locations.filter((loc) => ((draftLocationBlackouts && draftLocationBlackouts[loc]) || []).length > 0).length} Locations with Permit Blackouts</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-indigo-300">
+                    <Moon className="w-3.5 h-3.5" />
+                    <span>{draftDarkDays.length} Dark Days (Cast & Crew Hiatus)</span>
+                  </span>
                 </div>
               </div>
             </div>

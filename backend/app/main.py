@@ -681,17 +681,43 @@ async def update_production_plan(req: UpdatePlanRequest):
         sol.location_blackouts = STATE.get("location_blackouts", {})
         sol.dark_days = list(STATE.get("dark_days", []))
 
-        if req.scenes:
+        if req.scenes is not None:
             scene_lookup = {s.scene_id: s for s in req.scenes}
+            # 1. Update existing scenes and filter out scenes deleted in Plan Editor
             for d in sol.days:
                 updated_scenes = []
                 for sc in d.scenes:
                     if sc.scene_id in scene_lookup:
                         updated_scenes.append(scene_lookup[sc.scene_id])
-                    else:
-                        updated_scenes.append(sc)
                 d.scenes = updated_scenes
+
+            # 2. If scenes specify a locked_day, move them to that day on the board
+            for d in sol.days:
+                d.scenes = [
+                    sc for sc in d.scenes
+                    if not (sc.locked_day and sc.locked_day != d.day_number and 1 <= sc.locked_day <= len(sol.days))
+                ]
+
+            for s in req.scenes:
+                if s.locked_day and 1 <= s.locked_day <= len(sol.days):
+                    target_day = next((d for d in sol.days if d.day_number == s.locked_day), None)
+                    if target_day and not any(sc.scene_id == s.scene_id for sc in target_day.scenes):
+                        target_day.scenes.append(s)
+
+            # 3. Add any newly added scenes not yet placed on any board day
+            current_scheduled_ids = {sc.scene_id for d in sol.days for sc in d.scenes}
+            missing = [s for s in req.scenes if s.scene_id not in current_scheduled_ids]
+            if missing and sol.days:
+                for s in missing:
+                    target_day_num = s.locked_day if (s.locked_day and 1 <= s.locked_day <= len(sol.days)) else 1
+                    target_day = next((d for d in sol.days if d.day_number == target_day_num), sol.days[0])
+                    target_day.scenes.append(s)
+
+            # 4. Recompute duration, locations, and company moves per day
+            for d in sol.days:
                 d.total_duration_minutes = sum(s.est_shoot_minutes for s in d.scenes)
+                d.locations = sorted(list({s.location for s in d.scenes}))
+                d.company_moves = max(0, len(d.locations) - 1)
 
         for d in sol.days:
             if d.day_number in STATE["dark_days"]:
@@ -705,6 +731,18 @@ async def update_production_plan(req: UpdatePlanRequest):
                 cal_date, disp_date = get_day_dates(ps.start_date, d.day_number)
                 d.calendar_date = cal_date
                 d.date_display = disp_date
+
+        # Recalculate DOOD matrix with updated actors, blackouts, and dark days
+        scheduled_dict = {d.day_number: d.scenes for d in sol.days}
+        sol.dood_matrix = calculate_dood_matrix(
+            actors=STATE["actors"],
+            scheduled_days=scheduled_dict,
+            num_days=len(sol.days),
+            actor_blackouts=STATE.get("actor_blackouts", {}),
+            dark_days=STATE.get("dark_days", [])
+        )
+        sol.metrics.total_hold_days = sum(r.hold_days for r in sol.dood_matrix)
+        sol.metrics.total_company_moves = sum(d.company_moves for d in sol.days)
 
         sol.status = "PENDING_OPTIMIZATION"
         await event_bus.publish("schedule.optimized.solution", sol.model_dump())

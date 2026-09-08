@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Flame, AlertTriangle, Plus, Trash2, Zap, Moon } from 'lucide-react';
 import { DisruptionAlert, Actor, Scene, DaySchedule } from '../types';
 
@@ -34,8 +34,16 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
   const [selectedActor, setSelectedActor] = useState(actors[0]?.actor_id || 'ACTOR_SARAH');
   const [selectedLocation, setSelectedLocation] = useState(scenes[0]?.location || 'Warehouse District');
   const [disruptionType, setDisruptionType] = useState('ACTOR_DISRUPTION');
-  const [selectedDays, setSelectedDays] = useState<number[]>([2]);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [reason, setReason] = useState('');
+
+  // Reset day selection and form input whenever modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedDays([]);
+      setReason('');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -67,6 +75,7 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
     if (selectedDays.length === 0) return;
     const alert = createAlertObject();
     onInject(alert);
+    setSelectedDays([]);
     setReason('');
   };
 
@@ -191,7 +200,10 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
               <label className="block text-[11px] text-slate-400 font-medium mb-1">Disruption Target / Entity</label>
               <select
                 value={disruptionType}
-                onChange={(e) => setDisruptionType(e.target.value)}
+                onChange={(e) => {
+                  setDisruptionType(e.target.value);
+                  setSelectedDays([]);
+                }}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
               >
                 <option value="ACTOR_DISRUPTION">🎭 Actor Disruption (Illness / Conflict / Blackout)</option>

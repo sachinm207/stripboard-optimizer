@@ -1036,6 +1036,8 @@ export const App: React.FC = () => {
         startDate={solution?.days?.[0]?.calendar_date || '2026-10-12'}
         onPlanSaved={(updatedSol) => {
           setSolution(updatedSol);
+          setBaselineSolution(updatedSol);
+          setTentativeMoveCount(0);
           loadData();
           fetchUnionAudit().then(setUnionAudit).catch(() => null);
         }}
