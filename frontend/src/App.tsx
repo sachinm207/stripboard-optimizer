@@ -9,6 +9,7 @@ import { ImportModal } from './components/ImportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { VersionModal } from './components/VersionModal';
 import { PlanEditorModal } from './components/PlanEditorModal';
+import { WhatIfHUD } from './components/WhatIfHUD';
 import {
   fetchSchedule,
   fetchScenes,
@@ -29,6 +30,7 @@ import {
   updateConstraints,
   toggleSoftLock,
   clearSoftLocks,
+  saveVersion,
 } from './services/api';
 import { Scene, Actor, ScheduleSolution, DisruptionAlert, KafkaStatus, UnionAudit } from './types';
 import {
@@ -51,6 +53,9 @@ import {
 
 export const App: React.FC = () => {
   const [solution, setSolution] = useState<ScheduleSolution | null>(null);
+  const [baselineSolution, setBaselineSolution] = useState<ScheduleSolution | null>(null);
+  const [isWhatIfActive, setIsWhatIfActive] = useState<boolean>(false);
+  const [tentativeMoveCount, setTentativeMoveCount] = useState<number>(0);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [actors, setActors] = useState<Actor[]>([]);
   const [kafkaStatus, setKafkaStatus] = useState<KafkaStatus | null>(null);
@@ -79,6 +84,9 @@ export const App: React.FC = () => {
         fetchUnionAudit().catch(() => null),
       ]);
       setSolution(sched);
+      if (sched) {
+        setBaselineSolution(sched);
+      }
       setScenes(scs);
       setActors(acts);
       setKafkaStatus(kStat);
@@ -157,6 +165,9 @@ export const App: React.FC = () => {
     try {
       const resetSol = await resetSchedule();
       setSolution(resetSol);
+      setBaselineSolution(resetSol);
+      setTentativeMoveCount(0);
+      setIsWhatIfActive(false);
       const [kStat, uAudit] = await Promise.all([
         fetchKafkaStatus().catch(() => null),
         fetchUnionAudit().catch(() => null),
@@ -191,6 +202,9 @@ export const App: React.FC = () => {
     try {
       const updated = await loadPreset(presetId, optimize);
       setSolution(updated);
+      setBaselineSolution(updated);
+      setTentativeMoveCount(0);
+      setIsWhatIfActive(false);
       const [scs, acts, kStat, uAudit] = await Promise.all([
         fetchScenes(),
         fetchActors(),
@@ -214,6 +228,9 @@ export const App: React.FC = () => {
     try {
       const updated = await solveSchedule();
       setSolution(updated);
+      if (!isWhatIfActive && tentativeMoveCount === 0) {
+        setBaselineSolution(updated);
+      }
       const [kStat, uAudit] = await Promise.all([
         fetchKafkaStatus().catch(() => null),
         fetchUnionAudit().catch(() => null),
@@ -248,6 +265,11 @@ export const App: React.FC = () => {
   };
 
   const handleMoveScene = async (sceneId: string, targetDay: number) => {
+    if (!baselineSolution && solution) {
+      setBaselineSolution(JSON.parse(JSON.stringify(solution)));
+    }
+    setTentativeMoveCount((prev) => prev + 1);
+    setIsWhatIfActive(true);
     setIsSolving(true);
     try {
       const updated = await moveScene(sceneId, targetDay);
@@ -266,11 +288,63 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleCommitWhatIf = async () => {
+    if (!solution) return;
+    setIsSolving(true);
+    try {
+      await saveVersion(
+        `Committed What-If Scenario`,
+        `Promoted exploratory simulation (${tentativeMoveCount} scene moves) to official baseline schedule.`
+      ).catch(() => null);
+
+      setBaselineSolution(solution);
+      setTentativeMoveCount(0);
+      setIsWhatIfActive(false);
+
+      const updated = await solveSchedule();
+      setSolution(updated);
+      setBaselineSolution(updated);
+      const [kStat, uAudit] = await Promise.all([
+        fetchKafkaStatus().catch(() => null),
+        fetchUnionAudit().catch(() => null),
+      ]);
+      setKafkaStatus(kStat);
+      setUnionAudit(uAudit);
+      setError(null);
+    } catch (err: any) {
+      setError('Failed to commit What-If scenario: ' + err.message);
+    } finally {
+      setIsSolving(false);
+    }
+  };
+
+  const handleDiscardWhatIf = async () => {
+    setIsSolving(true);
+    try {
+      await clearSoftLocks().catch(() => null);
+      if (baselineSolution) {
+        setSolution(baselineSolution);
+      } else {
+        await loadData();
+      }
+      setTentativeMoveCount(0);
+      setIsWhatIfActive(false);
+      setError(null);
+    } catch (err: any) {
+      setError('Failed to discard What-If scenario: ' + err.message);
+    } finally {
+      setIsSolving(false);
+    }
+  };
+
   const handleClearSchedule = async () => {
     setIsSolving(true);
     try {
       await clearSchedule();
       setSolution(null);
+      setBaselineSolution(null);
+      setTentativeMoveCount(0);
+      setIsWhatIfActive(false);
       setScenes([]);
       setActors([]);
       setUnionAudit(null);
@@ -629,6 +703,9 @@ export const App: React.FC = () => {
                 days={solution.days}
                 onMoveScene={handleMoveScene}
                 onLockScene={handleLockScene}
+                isWhatIfMode={isWhatIfActive}
+                onToggleWhatIfMode={() => setIsWhatIfActive((prev) => !prev)}
+                tentativeMoveCount={tentativeMoveCount}
               />
             )}
 
@@ -952,6 +1029,7 @@ export const App: React.FC = () => {
         actors={actors}
         days={solution?.days || []}
         numDays={solution?.days?.length || 5}
+        doodMatrix={solution?.dood_matrix || []}
         actorBlackouts={solution?.actor_blackouts || {}}
         locationBlackouts={solution?.location_blackouts || {}}
         darkDays={solution?.dark_days || []}
@@ -974,6 +1052,29 @@ export const App: React.FC = () => {
         }}
         currentSolution={solution}
       />
+
+      {/* Tier 3: What-If Exploratory Simulation Floating HUD */}
+      {solution &&
+        (isWhatIfActive ||
+          tentativeMoveCount > 0 ||
+          (solution.status === 'PENDING_OPTIMIZATION' &&
+            !isChaosOpen &&
+            !isPlanEditorOpen &&
+            !isSettingsOpen)) && (
+          <WhatIfHUD
+            baselineSolution={baselineSolution}
+            currentSolution={solution}
+            isSolving={isSolving}
+            onSolveWhatIf={handleSolveSchedule}
+            onCommitWhatIf={handleCommitWhatIf}
+            onDiscardWhatIf={handleDiscardWhatIf}
+            tentativeMoveCount={tentativeMoveCount}
+            tentativePinCount={Object.values(solution.soft_locks || {}).reduce(
+              (acc, arr) => acc + arr.length,
+              0
+            )}
+          />
+        )}
     </div>
   );
 };

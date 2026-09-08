@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Clapperboard,
@@ -11,9 +11,13 @@ import {
   AlertCircle,
   ShieldCheck,
   Clock,
+  CheckCircle2,
+  DollarSign,
+  Plus,
+  Trash2,
 } from 'lucide-react';
-import { Scene, Actor, DaySchedule, ScheduleSolution } from '../types';
-import { updateProductionPlan } from '../services/api';
+import { Scene, Actor, DaySchedule, ScheduleSolution, ActorDOODRow } from '../types';
+import { updateProductionPlan, fetchProductionSettings, fetchScenes, fetchActors } from '../services/api';
 
 interface PlanEditorModalProps {
   isOpen: boolean;
@@ -22,6 +26,7 @@ interface PlanEditorModalProps {
   actors: Actor[];
   days: DaySchedule[];
   numDays: number;
+  doodMatrix?: ActorDOODRow[];
   actorBlackouts?: Record<string, number[]>;
   locationBlackouts?: Record<string, number[]>;
   darkDays?: number[];
@@ -40,6 +45,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
   actors: initialActors,
   days,
   numDays,
+  doodMatrix = [],
   actorBlackouts = {},
   locationBlackouts = {},
   darkDays = [],
@@ -62,26 +68,98 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
   const [draftTurnaround, setDraftTurnaround] = useState(wTurnaround);
   const [draftMaxMinutes, setDraftMaxMinutes] = useState(maxMinutesPerDay);
   const [draftPermitLeadDays, setDraftPermitLeadDays] = useState(permitLeadDays);
+  const [newLocationInput, setNewLocationInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // Sync existing board data whenever modal is opened
   useEffect(() => {
     if (isOpen) {
-      setScenes(JSON.parse(JSON.stringify(initialScenes)));
-      setActors(JSON.parse(JSON.stringify(initialActors)));
-      setDraftActorBlackouts(JSON.parse(JSON.stringify(actorBlackouts)));
-      setDraftLocationBlackouts(JSON.parse(JSON.stringify(locationBlackouts)));
-      setDraftDarkDays([...darkDays]);
-      setDraftStartDate(startDate);
-      setDraftTurnaround(wTurnaround);
-      setDraftMaxMinutes(maxMinutesPerDay);
-      setDraftPermitLeadDays(permitLeadDays);
+      // 1. Resolve scenes: Prioritize scenes list, merge/fallback to scenes currently scheduled on board days
+      const boardScenesMap = new Map<string, Scene>();
+      if (days && days.length > 0) {
+        for (const d of days) {
+          for (const sc of d.scenes) {
+            boardScenesMap.set(sc.scene_id, {
+              ...sc,
+              locked_day: sc.locked_day || null,
+            });
+          }
+        }
+      }
+
+      let mergedScenes: Scene[] = [];
+      if (initialScenes && initialScenes.length > 0) {
+        mergedScenes = initialScenes.map((sc) => {
+          const boardSc = boardScenesMap.get(sc.scene_id);
+          return boardSc ? { ...sc, locked_day: boardSc.locked_day ?? sc.locked_day } : sc;
+        });
+      } else {
+        mergedScenes = Array.from(boardScenesMap.values());
+      }
+      setScenes(mergedScenes);
+
+      // If still empty, fetch scenes from backend catalog
+      if (mergedScenes.length === 0) {
+        fetchScenes()
+          .then((scs) => {
+            if (scs && scs.length > 0) setScenes(scs);
+          })
+          .catch(() => null);
+      }
+
+      // 2. Resolve actors: Prioritize initialActors, fallback to DOOD matrix if needed
+      let mergedActors: Actor[] = [];
+      if (initialActors && initialActors.length > 0) {
+        mergedActors = JSON.parse(JSON.stringify(initialActors));
+      } else if (doodMatrix && doodMatrix.length > 0) {
+        mergedActors = doodMatrix.map((row) => ({
+          actor_id: row.actor_id,
+          name: row.name,
+          character_name: row.character_name,
+          daily_rate: 2500,
+          hold_rate: 2000,
+          blackout_days: actorBlackouts[row.actor_id] || [],
+        }));
+      }
+      setActors(mergedActors);
+
+      if (mergedActors.length === 0) {
+        fetchActors()
+          .then((acts) => {
+            if (acts && acts.length > 0) setActors(acts);
+          })
+          .catch(() => null);
+      }
+
+      // 3. Resolve blackouts, dark days & constraints
+      setDraftActorBlackouts(JSON.parse(JSON.stringify(actorBlackouts || {})));
+      setDraftLocationBlackouts(JSON.parse(JSON.stringify(locationBlackouts || {})));
+      setDraftDarkDays([...(darkDays || [])]);
+
+      // 4. Load latest settings directly from backend
+      fetchProductionSettings()
+        .then((s) => {
+          if (s.start_date) setDraftStartDate(s.start_date);
+          if (s.w_turnaround) setDraftTurnaround(s.w_turnaround);
+          if (s.max_minutes_per_day) setDraftMaxMinutes(s.max_minutes_per_day);
+          if (typeof s.permit_lead_days === 'number') setDraftPermitLeadDays(s.permit_lead_days);
+        })
+        .catch(() => {
+          setDraftStartDate(startDate);
+          setDraftTurnaround(wTurnaround);
+          setDraftMaxMinutes(maxMinutesPerDay);
+          setDraftPermitLeadDays(permitLeadDays);
+        });
+
       setStatusMessage(null);
     }
   }, [
     isOpen,
     initialScenes,
     initialActors,
+    days,
+    doodMatrix,
     actorBlackouts,
     locationBlackouts,
     darkDays,
@@ -91,11 +169,56 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
     permitLeadDays,
   ]);
 
+  // Pre-calculate which day each scene is currently scheduled on the active stripboard
+  const sceneScheduledDayMap = useMemo(() => {
+    const map = new Map<string, DaySchedule>();
+    if (days && days.length > 0) {
+      for (const d of days) {
+        for (const sc of d.scenes) {
+          map.set(sc.scene_id, d);
+        }
+      }
+    }
+    return map;
+  }, [days]);
+
+  // Pre-calculate which days each location is currently active on the board
+  const locationActiveDaysMap = useMemo(() => {
+    const map = new Map<string, number[]>();
+    if (days && days.length > 0) {
+      for (const d of days) {
+        for (const sc of d.scenes) {
+          const list = map.get(sc.location) || [];
+          if (!list.includes(d.day_number)) {
+            list.push(d.day_number);
+            map.set(sc.location, list.sort((a, b) => a - b));
+          }
+        }
+      }
+    }
+    return map;
+  }, [days]);
+
+  // Pre-calculate DOOD stats for each actor
+  const actorDoodMap = useMemo(() => {
+    const map = new Map<string, ActorDOODRow>();
+    if (doodMatrix && doodMatrix.length > 0) {
+      for (const row of doodMatrix) {
+        map.set(row.actor_id, row);
+      }
+    }
+    return map;
+  }, [doodMatrix]);
+
   if (!isOpen) return null;
 
   const totalDays = Math.max(numDays, days.length, 5);
   const allDays = Array.from({ length: totalDays }, (_, i) => i + 1);
-  const locations = Array.from(new Set(scenes.map((s) => s.location)));
+  const locations = useMemo(() => {
+    const set = new Set(scenes.map((s) => s.location).filter(Boolean));
+    Object.keys(draftLocationBlackouts).forEach((loc) => set.add(loc));
+    return Array.from(set).sort();
+  }, [scenes, draftLocationBlackouts]);
 
   // Scene editing helpers
   const handleUpdateScene = (idx: number, field: keyof Scene, value: any) => {
@@ -104,12 +227,68 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
     setScenes(updated);
   };
 
+  const handleDeleteScene = (idx: number) => {
+    const updated = scenes.filter((_, i) => i !== idx);
+    setScenes(updated);
+  };
+
+  const handleAddScene = () => {
+    const nextNum = scenes.length > 0 ? (Math.max(...scenes.map((s) => parseInt(s.scene_number) || 0)) + 1).toString() : '1';
+    const newSc: Scene = {
+      scene_id: `SC_${nextNum.padStart(2, '0')}`,
+      scene_number: nextNum,
+      slugline: `INT. NEW STAGE - DAY`,
+      setting: 'INT_DAY' as any,
+      location: locations[0] || 'Studio Soundstage',
+      pages_eighths: 8,
+      est_shoot_minutes: 120,
+      cast_ids: actors.length > 0 ? [actors[0].actor_id] : [],
+      description: 'New script revision scene',
+      locked_day: null,
+    };
+    setScenes([...scenes, newSc]);
+  };
+
   const handleToggleSceneCast = (sceneIdx: number, actorId: string) => {
     const sc = scenes[sceneIdx];
     const cast = sc.cast_ids.includes(actorId)
       ? sc.cast_ids.filter((id) => id !== actorId)
       : [...sc.cast_ids, actorId];
     handleUpdateScene(sceneIdx, 'cast_ids', cast);
+  };
+
+  // Actor editing helpers
+  const handleUpdateActor = (actorId: string, field: keyof Actor, value: any) => {
+    setActors(actors.map((a) => (a.actor_id === actorId ? { ...a, [field]: value } : a)));
+  };
+
+  const handleDeleteActor = (actorId: string) => {
+    setActors(actors.filter((a) => a.actor_id !== actorId));
+    const nextBlackouts = { ...draftActorBlackouts };
+    delete nextBlackouts[actorId];
+    setDraftActorBlackouts(nextBlackouts);
+  };
+
+  const handleAddActor = () => {
+    const nextIdx = actors.length + 1;
+    const newAct: Actor = {
+      actor_id: `ACTOR_${nextIdx}`,
+      name: `New Cast Member ${nextIdx}`,
+      character_name: `Role ${nextIdx}`,
+      daily_rate: 3000,
+      hold_rate: 1500,
+      blackout_days: [],
+    };
+    setActors([...actors, newAct]);
+  };
+
+  // Location helpers
+  const handleAddLocation = (locName: string) => {
+    if (!locName.trim()) return;
+    if (!draftLocationBlackouts[locName]) {
+      setDraftLocationBlackouts({ ...draftLocationBlackouts, [locName]: [] });
+    }
+    setNewLocationInput('');
   };
 
   // Actor blackout toggles
@@ -177,11 +356,14 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-base text-white tracking-tight">Production Plan Editor</h3>
                 <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
-                  Official Hard Constraints
+                  Official Ground Truth
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+                  Populated from Current Board ({scenes.length} Scenes, {days.length} Days)
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Ground truth production rules: Script scenes, talent contracts, location permits, and production calendar.
+                Modify baseline ground truth: script scenes, contract blackouts, permit windows, and schedule calendar.
               </p>
             </div>
           </div>
@@ -257,124 +439,154 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
           {/* TAB 1: SCENES & SCRIPT BREAKDOWN */}
           {activeTab === 'scenes' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h4 className="text-xs font-bold text-white uppercase tracking-wider">Shooting Script Scenes</h4>
                   <p className="text-[11px] text-slate-400">
-                    Edit shoot durations, INT/EXT lighting, cast calls, and hard schedule day locks.
+                    Existing scenes from current stripboard. Modify durations, lighting settings, cast calls, and locked days.
                   </p>
                 </div>
-                <div className="text-xs text-slate-400 font-mono">
-                  Total Duration:{' '}
-                  <span className="text-amber-400 font-bold">
-                    {Math.round(scenes.reduce((acc, s) => acc + s.est_shoot_minutes, 0) / 60)} hrs
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs text-slate-400 font-mono">
+                    Total Duration:{' '}
+                    <span className="text-amber-400 font-bold">
+                      {Math.round(scenes.reduce((acc, s) => acc + s.est_shoot_minutes, 0) / 60)} hrs
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddScene}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 text-xs font-bold transition-all cursor-pointer shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-indigo-300" />
+                    <span>+ Add Scene</span>
+                  </button>
                 </div>
               </div>
 
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                {scenes.map((sc, idx) => (
-                  <div
-                    key={sc.scene_id}
-                    className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition-all space-y-3"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono font-bold text-xs">
-                          Scene {sc.scene_number}
-                        </span>
-                        <input
-                          type="text"
-                          value={sc.slugline}
-                          onChange={(e) => handleUpdateScene(idx, 'slugline', e.target.value)}
-                          className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white font-semibold focus:outline-none focus:border-indigo-500 min-w-[280px]"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs">
-                        {/* Setting Pill */}
-                        <select
-                          value={sc.setting}
-                          onChange={(e) => handleUpdateScene(idx, 'setting', e.target.value)}
-                          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-indigo-500 cursor-pointer"
-                        >
-                          <option value="INT_DAY">INT DAY</option>
-                          <option value="EXT_DAY">EXT DAY</option>
-                          <option value="INT_NIGHT">INT NIGHT</option>
-                          <option value="EXT_NIGHT">EXT NIGHT</option>
-                        </select>
-
-                        {/* Location */}
-                        <input
-                          type="text"
-                          value={sc.location}
-                          onChange={(e) => handleUpdateScene(idx, 'location', e.target.value)}
-                          placeholder="Location"
-                          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 w-36"
-                        />
-
-                        {/* Est Minutes */}
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-slate-500" />
+                {scenes.map((sc, idx) => {
+                  const scheduledDay = sceneScheduledDayMap.get(sc.scene_id);
+                  return (
+                    <div
+                      key={sc.scene_id}
+                      className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition-all space-y-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono font-bold text-xs">
+                            Scene {sc.scene_number}
+                          </span>
                           <input
-                            type="number"
-                            min={15}
-                            step={15}
-                            value={sc.est_shoot_minutes}
-                            onChange={(e) => handleUpdateScene(idx, 'est_shoot_minutes', Number(e.target.value))}
-                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:border-indigo-500 w-16"
+                            type="text"
+                            value={sc.slugline}
+                            onChange={(e) => handleUpdateScene(idx, 'slugline', e.target.value)}
+                            className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white font-semibold focus:outline-none focus:border-indigo-500 min-w-[280px]"
                           />
-                          <span className="text-[10px] text-slate-500">min</span>
+                          {/* Live Scheduled Day Tag */}
+                          {scheduledDay && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <span>Board: Day {scheduledDay.day_number}{scheduledDay.date_display ? ` (${scheduledDay.date_display})` : ''}</span>
+                            </span>
+                          )}
                         </div>
 
-                        {/* Hard Pin to Day Lock */}
-                        <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded px-2 py-1">
-                          {sc.locked_day ? (
-                            <Lock className="w-3 h-3 text-amber-400" />
-                          ) : (
-                            <Unlock className="w-3 h-3 text-slate-500" />
-                          )}
+                        <div className="flex items-center gap-2 text-xs">
+                          {/* Setting Pill */}
                           <select
-                            value={sc.locked_day || ''}
-                            onChange={(e) =>
-                              handleUpdateScene(idx, 'locked_day', e.target.value ? Number(e.target.value) : null)
-                            }
-                            className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
+                            value={sc.setting}
+                            onChange={(e) => handleUpdateScene(idx, 'setting', e.target.value)}
+                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-indigo-500 cursor-pointer"
                           >
-                            <option value="">Flexible</option>
-                            {allDays.map((d) => (
-                              <option key={d} value={d}>
-                                Lock Day {d}
-                              </option>
-                            ))}
+                            <option value="INT_DAY">INT DAY</option>
+                            <option value="EXT_DAY">EXT DAY</option>
+                            <option value="INT_NIGHT">INT NIGHT</option>
+                            <option value="EXT_NIGHT">EXT NIGHT</option>
                           </select>
+
+                          {/* Location */}
+                          <input
+                            type="text"
+                            value={sc.location}
+                            onChange={(e) => handleUpdateScene(idx, 'location', e.target.value)}
+                            placeholder="Location"
+                            className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 w-36"
+                          />
+
+                          {/* Est Minutes */}
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-slate-500" />
+                            <input
+                              type="number"
+                              min={15}
+                              step={15}
+                              value={sc.est_shoot_minutes}
+                              onChange={(e) => handleUpdateScene(idx, 'est_shoot_minutes', Number(e.target.value))}
+                              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-amber-300 font-mono focus:outline-none focus:border-indigo-500 w-16"
+                            />
+                            <span className="text-[10px] text-slate-500">min</span>
+                          </div>
+
+                          {/* Hard Pin to Day Lock */}
+                          <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded px-2 py-1">
+                            {sc.locked_day ? (
+                              <Lock className="w-3 h-3 text-amber-400" />
+                            ) : (
+                              <Unlock className="w-3 h-3 text-slate-500" />
+                            )}
+                            <select
+                              value={sc.locked_day || ''}
+                              onChange={(e) =>
+                                handleUpdateScene(idx, 'locked_day', e.target.value ? Number(e.target.value) : null)
+                              }
+                              className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
+                            >
+                              <option value="">Flexible (Auto)</option>
+                              {allDays.map((d) => (
+                                <option key={d} value={d}>
+                                  Lock Day {d}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Delete Scene Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteScene(idx)}
+                            className="p-1 rounded bg-slate-900 border border-slate-700 text-slate-500 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-950/30 transition-all cursor-pointer ml-0.5"
+                            title="Delete Scene from Script"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Cast required chips */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-900 text-xs">
-                      <span className="text-[11px] text-slate-400 mr-1">Cast Required:</span>
-                      {actors.map((act) => {
-                        const isCast = sc.cast_ids.includes(act.actor_id);
-                        return (
-                          <button
-                            key={act.actor_id}
-                            type="button"
-                            onClick={() => handleToggleSceneCast(idx, act.actor_id)}
-                            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                              isCast
-                                ? 'bg-purple-600/30 border border-purple-500/50 text-purple-300'
-                                : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-slate-300'
-                            }`}
-                          >
-                            {act.name}
-                          </button>
-                        );
-                      })}
+                      {/* Cast required chips */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-900 text-xs">
+                        <span className="text-[11px] text-slate-400 mr-1">Cast Required:</span>
+                        {actors.map((act) => {
+                          const isCast = sc.cast_ids.includes(act.actor_id);
+                          return (
+                            <button
+                              key={act.actor_id}
+                              type="button"
+                              onClick={() => handleToggleSceneCast(idx, act.actor_id)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                                isCast
+                                  ? 'bg-purple-600/30 border border-purple-500/50 text-purple-300'
+                                  : 'bg-slate-900 border border-slate-800 text-slate-500 hover:text-slate-300'
+                              }`}
+                            >
+                              {act.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -382,38 +594,99 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
           {/* TAB 2: CAST & CONTRACT BLACKOUTS */}
           {activeTab === 'cast' && (
             <div className="space-y-4">
-              <div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Talent Roster & Contractual Blackouts
-                </h4>
-                <p className="text-[11px] text-slate-400">
-                  Mark non-negotiable contract blackout days where the actor cannot be scheduled (e.g. prior commitments, Broadway contracts).
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Talent Roster & Contractual Blackouts
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Current actors populated from production. Modify names, rates, and mark contractual blackout days where talent cannot shoot.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddActor}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 text-purple-200 text-xs font-bold transition-all cursor-pointer shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5 text-purple-300" />
+                  <span>+ Add Cast Member</span>
+                </button>
               </div>
 
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                 {actors.map((act) => {
                   const blackouts = draftActorBlackouts[act.actor_id] || [];
+                  const dood = actorDoodMap.get(act.actor_id);
                   return (
                     <div
                       key={act.actor_id}
                       className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-bold text-white flex items-center gap-2">
-                            <span>{act.name}</span>
-                            <span className="text-xs text-slate-400 font-normal">as {act.character_name}</span>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div>
+                            <input
+                              type="text"
+                              value={act.name}
+                              onChange={(e) => handleUpdateActor(act.actor_id, 'name', e.target.value)}
+                              className="bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-sm text-white font-bold focus:outline-none focus:border-purple-500 w-44"
+                              placeholder="Actor Name"
+                            />
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className="text-xs text-slate-500">as</span>
+                              <input
+                                type="text"
+                                value={act.character_name}
+                                onChange={(e) => handleUpdateActor(act.actor_id, 'character_name', e.target.value)}
+                                className="bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-300 focus:outline-none focus:border-purple-500 w-36"
+                                placeholder="Character Name"
+                              />
+                            </div>
                           </div>
-                          <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                            Day Rate: ${act.daily_rate.toLocaleString()} | Idle Hold Rate: ${act.hold_rate.toLocaleString()} / day
+
+                          <div className="text-[11px] text-slate-400 font-mono flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-1">
+                              <span>Day $:</span>
+                              <input
+                                type="number"
+                                step={100}
+                                value={act.daily_rate}
+                                onChange={(e) => handleUpdateActor(act.actor_id, 'daily_rate', Number(e.target.value))}
+                                className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-emerald-300 font-mono w-20 focus:outline-none focus:border-purple-500"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span>Hold $:</span>
+                              <input
+                                type="number"
+                                step={100}
+                                value={act.hold_rate}
+                                onChange={(e) => handleUpdateActor(act.actor_id, 'hold_rate', Number(e.target.value))}
+                                className="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-amber-300 font-mono w-20 focus:outline-none focus:border-purple-500"
+                              />
+                            </div>
+                            {dood && (
+                              <span className="text-emerald-400 text-[10px] hidden sm:inline ml-1">
+                                (Board: {dood.work_days}W / {dood.hold_days}H = ${dood.talent_cost.toLocaleString()})
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        <div className="text-xs text-amber-400 font-mono">
-                          {blackouts.length > 0
-                            ? `${blackouts.length} contract blackout day(s)`
-                            : 'Fully available'}
+                        <div className="flex items-center gap-3">
+                          <div className="text-xs text-amber-400 font-mono">
+                            {blackouts.length > 0
+                              ? `${blackouts.length} contract blackout day(s)`
+                              : 'Fully available'}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteActor(act.actor_id)}
+                            className="p-1 rounded bg-slate-900 border border-slate-700 text-slate-500 hover:text-rose-400 hover:border-rose-500/50 hover:bg-rose-950/30 transition-all cursor-pointer"
+                            title="Remove Actor"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
@@ -425,6 +698,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                         <div className="flex flex-wrap items-center gap-1.5">
                           {allDays.map((d) => {
                             const isBlackout = blackouts.includes(d);
+                            const daySched = days.find((day) => day.day_number === d);
                             return (
                               <button
                                 key={d}
@@ -435,7 +709,11 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                                     ? 'bg-rose-600 text-white border-rose-500 shadow-sm shadow-rose-900/40'
                                     : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
                                 }`}
-                                title={isBlackout ? `Day ${d}: Contract Blackout (Unavailable)` : `Day ${d}: Available`}
+                                title={
+                                  isBlackout
+                                    ? `Day ${d}${daySched?.date_display ? ` (${daySched.date_display})` : ''}: Contract Blackout`
+                                    : `Day ${d}${daySched?.date_display ? ` (${daySched.date_display})` : ''}: Available`
+                                }
                               >
                                 {d}
                               </button>
@@ -453,19 +731,46 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
           {/* TAB 3: LOCATIONS & PERMITS */}
           {activeTab === 'locations' && (
             <div className="space-y-4">
-              <div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Locations & City Permit Blackouts
-                </h4>
-                <p className="text-[11px] text-slate-400">
-                  Configure city film commission permit restrictions. Mark days when filming at each location is prohibited.
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Locations & City Permit Blackouts
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Locations populated from active board. Configure municipal permit blackout days.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newLocationInput}
+                    onChange={(e) => setNewLocationInput(e.target.value)}
+                    placeholder="New Location Name..."
+                    className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-sky-500 w-44"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddLocation(newLocationInput);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddLocation(newLocationInput)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600/30 hover:bg-sky-600/50 border border-sky-500/50 text-sky-200 text-xs font-bold transition-all cursor-pointer shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add Permit</span>
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                 {locations.map((loc) => {
                   const blackouts = draftLocationBlackouts[loc] || [];
                   const locScenes = scenes.filter((s) => s.location === loc);
+                  const activeDays = locationActiveDaysMap.get(loc) || [];
                   return (
                     <div
                       key={loc}
@@ -477,8 +782,13 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                             <MapPin className="w-4 h-4 text-sky-400" />
                             <span>{loc}</span>
                           </div>
-                          <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                            {locScenes.length} scenes scheduled at this location
+                          <div className="text-[11px] text-slate-400 font-mono mt-0.5 flex flex-wrap items-center gap-3">
+                            <span>{locScenes.length} scenes scheduled</span>
+                            {activeDays.length > 0 && (
+                              <span className="text-sky-300">
+                                Active on Board: {activeDays.map((d) => `Day ${d}`).join(', ')}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -497,6 +807,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                         <div className="flex flex-wrap items-center gap-1.5">
                           {allDays.map((d) => {
                             const isBlackout = blackouts.includes(d);
+                            const daySched = days.find((day) => day.day_number === d);
                             return (
                               <button
                                 key={d}
@@ -507,7 +818,11 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                                     ? 'bg-sky-600 text-white border-sky-500 shadow-sm shadow-sky-900/40'
                                     : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
                                 }`}
-                                title={isBlackout ? `Day ${d}: Location Unavailable` : `Day ${d}: Permitted`}
+                                title={
+                                  isBlackout
+                                    ? `Day ${d}${daySched?.date_display ? ` (${daySched.date_display})` : ''}: Location Unavailable`
+                                    : `Day ${d}${daySched?.date_display ? ` (${daySched.date_display})` : ''}: Permitted`
+                                }
                               >
                                 {d}
                               </button>
@@ -600,19 +915,20 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                 <div className="flex flex-wrap items-center gap-1.5">
                   {allDays.map((d) => {
                     const isDark = draftDarkDays.includes(d);
+                    const daySched = days.find((day) => day.day_number === d);
                     return (
                       <button
                         key={d}
                         type="button"
                         onClick={() => handleToggleDarkDay(d)}
-                        className={`w-10 h-8 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                           isDark
                             ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-950/50'
                             : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
                         }`}
                         title={isDark ? `Day ${d}: Scheduled Hiatus` : `Day ${d}: Shooting Day`}
                       >
-                        Day {d}
+                        Day {d}{daySched?.date_display ? ` (${daySched.date_display})` : ''}
                       </button>
                     );
                   })}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Moon, Sun, MapPin, AlertCircle, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Moon, Sun, MapPin, AlertCircle, Calendar, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { DaySchedule } from '../types';
 import { StripItem } from './StripItem';
 
@@ -7,9 +7,19 @@ interface StripboardProps {
   days: DaySchedule[];
   onMoveScene?: (sceneId: string, targetDay: number) => void;
   onLockScene?: (sceneId: string, lockedDay: number | null) => void;
+  isWhatIfMode?: boolean;
+  onToggleWhatIfMode?: () => void;
+  tentativeMoveCount?: number;
 }
 
-export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLockScene }) => {
+export const Stripboard: React.FC<StripboardProps> = ({
+  days,
+  onMoveScene,
+  onLockScene,
+  isWhatIfMode = false,
+  onToggleWhatIfMode,
+  tentativeMoveCount = 0,
+}) => {
   const [selectedWeek, setSelectedWeek] = useState<number | 'all'>('all');
   const totalWeeks = Math.ceil(days.length / 5);
 
@@ -41,8 +51,30 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLoc
           <span className="text-xs font-normal text-slate-400">({days.length} Shoot Days total)</span>
         </h2>
 
-        {/* Legend */}
-        <div className="hidden sm:flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          {onToggleWhatIfMode && (
+            <button
+              type="button"
+              onClick={onToggleWhatIfMode}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                isWhatIfMode
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/50 shadow-sky-950/40 ring-1 ring-sky-400/40'
+                  : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+              }`}
+              title="Toggle What-If simulation mode to test schedule rearrangements without overwriting official plan"
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${isWhatIfMode ? 'text-sky-400' : 'text-slate-400'}`} />
+              <span>{isWhatIfMode ? '🧪 What-If Sandbox Active' : '🧪 What-If Sandbox'}</span>
+              {tentativeMoveCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-sky-500 text-slate-950 font-black text-[10px]">
+                  {tentativeMoveCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Legend */}
+          <div className="hidden sm:flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm bg-amber-200 border border-amber-300" />
             <span className="text-slate-300 text-[11px]">EXT DAY</span>
@@ -61,6 +93,7 @@ export const Stripboard: React.FC<StripboardProps> = ({ days, onMoveScene, onLoc
           </div>
         </div>
       </div>
+    </div>
 
       {/* Week Navigation & Day Filter for Multi-Week Productions (e.g., 20 - 100 days) */}
       {days.length > 7 && (
