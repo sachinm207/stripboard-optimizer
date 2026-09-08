@@ -45,23 +45,41 @@ export const DoodMatrix: React.FC<DoodMatrixProps> = ({ doodMatrix, numDays }) =
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-slate-800 text-slate-400 font-medium">
-              <th className="py-2.5 px-3">Character / Cast</th>
+              <th className="py-2.5 px-3 min-w-[170px] sticky left-0 bg-slate-900 z-10 border-r border-slate-800">Character / Cast</th>
+              <th className="py-2.5 px-3 text-right min-w-[100px] border-r border-slate-800/80 bg-slate-900/60 font-semibold text-slate-300">Talent Cost</th>
+              <th className="py-2.5 px-2 text-center min-w-[60px] border-r border-slate-800/60 bg-slate-900/40 font-semibold text-slate-300">Work</th>
+              <th className="py-2.5 px-2 text-center min-w-[60px] border-r border-slate-800/80 bg-slate-900/40 font-semibold text-slate-300">Hold</th>
               {daysHeader.map((d) => (
-                <th key={d} className="py-2.5 px-2 text-center">
+                <th key={d} className="py-2.5 px-2 text-center min-w-[60px]">
                   Day {d}
                 </th>
               ))}
-              <th className="py-2.5 px-3 text-center">Work</th>
-              <th className="py-2.5 px-3 text-center">Hold</th>
-              <th className="py-2.5 px-3 text-right">Talent Cost</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {doodMatrix.map((row) => (
               <tr key={row.actor_id} className="hover:bg-slate-800/30 transition-colors">
-                <td className="py-2.5 px-3">
+                <td className="py-2.5 px-3 sticky left-0 bg-slate-900 z-10 border-r border-slate-800">
                   <div className="font-semibold text-white">{row.character_name}</div>
                   <div className="text-[11px] text-slate-400">{row.name}</div>
+                </td>
+
+                <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400 bg-slate-900/40 border-r border-slate-800/80 whitespace-nowrap">
+                  ${row.talent_cost.toLocaleString()}
+                </td>
+
+                <td className="py-2.5 px-2 text-center font-mono font-semibold text-slate-300 bg-slate-900/20 border-r border-slate-800/60">
+                  {row.work_days}d
+                </td>
+
+                <td className="py-2.5 px-2 text-center font-mono border-r border-slate-800/80">
+                  {row.hold_days > 0 ? (
+                    <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold">
+                      {row.hold_days}d
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">0d</span>
+                  )}
                 </td>
 
                 {row.day_codes.map((code, idx) => {
@@ -84,36 +102,18 @@ export const DoodMatrix: React.FC<DoodMatrixProps> = ({ doodMatrix, numDays }) =
                     </td>
                   );
                 })}
-
-                <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-300">
-                  {row.work_days}d
-                </td>
-
-                <td className="py-2.5 px-3 text-center font-mono">
-                  {row.hold_days > 0 ? (
-                    <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold">
-                      {row.hold_days}d
-                    </span>
-                  ) : (
-                    <span className="text-slate-500">0d</span>
-                  )}
-                </td>
-
-                <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">
-                  ${row.talent_cost.toLocaleString()}
-                </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="border-t border-slate-700 bg-slate-800/30 font-bold">
-              <td className="py-3 px-3 text-white">TOTALS ({doodMatrix.length} Actors)</td>
-              <td colSpan={numDays}></td>
-              <td className="py-3 px-3 text-center text-slate-300 font-mono">{totalWorkDays}d</td>
-              <td className="py-3 px-3 text-center text-rose-300 font-mono">{totalHoldDays}d</td>
-              <td className="py-3 px-3 text-right text-emerald-400 font-mono text-sm">
+              <td className="py-3 px-3 text-white sticky left-0 bg-slate-900 z-10 border-r border-slate-800">TOTALS ({doodMatrix.length} Actors)</td>
+              <td className="py-3 px-3 text-right text-emerald-400 font-mono text-sm border-r border-slate-800/80">
                 ${totalCost.toLocaleString()}
               </td>
+              <td className="py-3 px-2 text-center text-slate-300 font-mono border-r border-slate-800/60">{totalWorkDays}d</td>
+              <td className="py-3 px-2 text-center text-rose-300 font-mono border-r border-slate-800/80">{totalHoldDays}d</td>
+              <td colSpan={numDays}></td>
             </tr>
           </tfoot>
         </table>

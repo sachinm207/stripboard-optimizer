@@ -57,14 +57,9 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'cast' | 'location'>('cast');
   const [isEditing, setIsEditing] = useState(false);
-  const [isEditingDarkDays, setIsEditingDarkDays] = useState(false);
-
   // Draft state for matrix blackouts (Actor contracts & Location permits)
   const [draftActorBlackouts, setDraftActorBlackouts] = useState<Record<string, number[]>>(actorBlackouts);
   const [draftLocationBlackouts, setDraftLocationBlackouts] = useState<Record<string, number[]>>(locationBlackouts);
-
-  // Draft state for pre-planned dark days calendar
-  const [draftDarkDays, setDraftDarkDays] = useState<number[]>(darkDays);
 
   // Local staging for What-If exploratory soft locks (batching instead of immediate execution)
   const [stagedSoftLocks, setStagedSoftLocks] = useState<Record<string, number[]>>(softLocks || {});
@@ -76,12 +71,6 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
       setDraftLocationBlackouts(locationBlackouts);
     }
   }, [actorBlackouts, locationBlackouts, isEditing]);
-
-  useEffect(() => {
-    if (!isEditingDarkDays) {
-      setDraftDarkDays(darkDays);
-    }
-  }, [darkDays, isEditingDarkDays]);
 
   useEffect(() => {
     setStagedSoftLocks(softLocks || {});
@@ -96,15 +85,19 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
     ? daysHeader
     : daysHeader.filter((d) => Math.ceil(d / 5) === selectedWeek);
 
-  // Dropdown & Range helpers for Dark Days Calendar
-  const [selectedDarkDayToAdd, setSelectedDarkDayToAdd] = useState<number>(1);
-  const [rangeStart, setRangeStart] = useState<number>(1);
-  const [rangeEnd, setRangeEnd] = useState<number>(Math.min(numDays, 3));
-
   // Extract unique locations from all days
   const allLocations = Array.from(
     new Set(days.flatMap((d) => d.scenes.map((s) => s.location)))
   ).sort();
+
+  // Aggregate totals for summary rows
+  const totalCastCost = doodMatrix.reduce((acc, r) => acc + r.talent_cost, 0);
+  const totalCastWork = doodMatrix.reduce((acc, r) => acc + r.work_days, 0);
+  const totalCastHold = doodMatrix.reduce((acc, r) => acc + r.hold_days, 0);
+  const totalLocationDays = allLocations.reduce(
+    (acc, loc) => acc + days.filter((d) => d.locations.includes(loc)).length,
+    0
+  );
 
   // Compare staged locks with active locks in current schedule
   const isSoftLockDirty = JSON.stringify(stagedSoftLocks) !== JSON.stringify(softLocks || {});
@@ -113,7 +106,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
 
   // Handlers for Matrix Blackouts Editing (Edit Hard Constraints)
   const handleToggleActorDraftBlackout = (actorId: string, day: number) => {
-    if (!isEditing || (darkDays || []).includes(day) || (draftDarkDays || []).includes(day)) return;
+    if (!isEditing || (darkDays || []).includes(day)) return;
     const current = (draftActorBlackouts[actorId] || []).filter((d) => !(darkDays || []).includes(d));
     const updated = current.includes(day)
       ? current.filter((d) => d !== day)
@@ -122,7 +115,7 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
   };
 
   const handleToggleLocationDraftBlackout = (location: string, day: number) => {
-    if (!isEditing || (darkDays || []).includes(day) || (draftDarkDays || []).includes(day)) return;
+    if (!isEditing || (darkDays || []).includes(day)) return;
     const current = (draftLocationBlackouts[location] || []).filter((d) => !(darkDays || []).includes(d));
     const updated = current.includes(day)
       ? current.filter((d) => d !== day)
@@ -144,64 +137,6 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
     setDraftActorBlackouts(actorBlackouts);
     setDraftLocationBlackouts(locationBlackouts);
     setIsEditing(false);
-  };
-
-  // Handlers for Pre-Planned Dark Days Calendar (Configure Dark Days)
-  const handleToggleDraftDarkDay = (day: number) => {
-    if (!isEditingDarkDays) return;
-    const isAdding = !draftDarkDays.includes(day);
-    const updated = isAdding
-      ? [...draftDarkDays, day].sort((a, b) => a - b)
-      : draftDarkDays.filter((d) => d !== day);
-    setDraftDarkDays(updated);
-
-    if (isAdding) {
-      // Clean up actor and location blackouts for this newly dark day
-      const updatedActorBl: Record<string, number[]> = {};
-      Object.entries(draftActorBlackouts).forEach(([aid, bDays]) => {
-        updatedActorBl[aid] = (bDays || []).filter((d) => d !== day);
-      });
-      setDraftActorBlackouts(updatedActorBl);
-
-      const updatedLocBl: Record<string, number[]> = {};
-      Object.entries(draftLocationBlackouts).forEach(([loc, bDays]) => {
-        updatedLocBl[loc] = (bDays || []).filter((d) => d !== day);
-      });
-      setDraftLocationBlackouts(updatedLocBl);
-    }
-  };
-
-  const handleSaveDarkDays = async () => {
-    if (!onSaveConstraints) return;
-    await onSaveConstraints({
-      actor_blackouts: actorBlackouts,
-      location_blackouts: locationBlackouts,
-      dark_days: draftDarkDays,
-    });
-    setIsEditingDarkDays(false);
-  };
-
-  const handleCancelDarkDays = () => {
-    setDraftDarkDays(darkDays);
-    setIsEditingDarkDays(false);
-  };
-
-  const handleAddSingleDarkDay = () => {
-    if (!isEditingDarkDays) return;
-    if (selectedDarkDayToAdd && !draftDarkDays.includes(selectedDarkDayToAdd)) {
-      setDraftDarkDays([...draftDarkDays, selectedDarkDayToAdd].sort((a, b) => a - b));
-    }
-  };
-
-  const handleApplyDarkRange = () => {
-    if (!isEditingDarkDays) return;
-    const start = Math.max(1, Math.min(rangeStart, rangeEnd));
-    const end = Math.min(numDays, Math.max(rangeStart, rangeEnd));
-    const newDays = new Set(draftDarkDays);
-    for (let d = start; d <= end; d++) {
-      newDays.add(d);
-    }
-    setDraftDarkDays(Array.from(newDays).sort((a, b) => a - b));
   };
 
   // Handlers for What-If Exploratory Soft Locks (Staged locally, no instant re-solve)
@@ -232,17 +167,19 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
 
   // Check if a cell is an active hard blackout
   const isActorBlackout = (actorId: string, day: number) => {
+    if (isDayDark(day)) return false;
     const list = isEditing ? draftActorBlackouts[actorId] : actorBlackouts[actorId];
     return list?.includes(day);
   };
 
   const isLocationBlackout = (location: string, day: number) => {
+    if (isDayDark(day)) return false;
     const list = isEditing ? draftLocationBlackouts[location] : locationBlackouts[location];
     return list?.includes(day);
   };
 
   const isDayDark = (day: number) => {
-    return isEditingDarkDays ? draftDarkDays.includes(day) : darkDays.includes(day);
+    return (darkDays || []).includes(day);
   };
 
   return (
@@ -386,241 +323,41 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
         </div>
       </div>
 
-      {/* DEDICATED PRE-PLANNED DARK DAYS & STATUTORY HIATUS CALENDAR (SOLE LOCATION FOR DARK DAYS) */}
-      <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3 shadow-inner">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div>
-            <div className="flex items-center gap-2">
-              <Moon className="w-4 h-4 text-indigo-400" />
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                🗓️ Pre-Planned Dark Days & Hiatus Calendar
-              </h4>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950 border border-indigo-700 text-indigo-300">
-                Company-Wide Hiatus
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Pre-schedule statutory rest days, holidays, festivals, or municipal permit freezes. The solver strictly schedules 0 scenes on dark dates.
-            </p>
+      {/* Production Dark Days & Hiatus Status */}
+      {darkDays.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-indigo-950/40 border border-indigo-800/40 text-xs shadow-inner">
+          <div className="flex items-center gap-2.5 text-indigo-200">
+            <Moon className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span>
+              <strong className="text-white">Scheduled Dark Days ({darkDays.length}):</strong>{' '}
+              {darkDays.map((d) => {
+                const daySchedule = days.find((day) => day.day_number === d);
+                return `Day ${d}${daySchedule?.date_display ? ` (${daySchedule.date_display.split(', ')[1] || daySchedule.date_display})` : ''}`;
+              }).join(', ')} — <span className="text-indigo-300">Company Hiatus (0 filming calls)</span>
+            </span>
           </div>
-
-          <div className="shrink-0 flex items-center gap-2">
-            {!isEditingDarkDays ? (
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-slate-400">
+              Calendar & dark days managed centrally in <strong className="text-purple-300 font-semibold">Plan Editor 📝</strong>
+            </span>
+            {onOpenChaos && (
               <button
-                onClick={() => setIsEditingDarkDays(true)}
-                disabled={isSolving}
-                className="px-3.5 py-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/80 text-indigo-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                title="Configure company dark days and statutory hiatus"
+                onClick={onOpenChaos}
+                className="text-rose-400 hover:text-rose-300 text-[11px] font-bold flex items-center gap-1 hover:underline cursor-pointer border-l border-indigo-800/60 pl-3"
               >
-                <Edit3 className="w-3.5 h-3.5 text-indigo-300" />
-                <span>Configure Dark Days</span>
+                <span>Throw Chaos 🚨</span>
               </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleCancelDarkDays}
-                  disabled={isSolving}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                  <span>Cancel</span>
-                </button>
-                <button
-                  onClick={handleSaveDarkDays}
-                  disabled={isSolving}
-                  className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isSolving ? 'Saving...' : 'Save Dark Days'}</span>
-                </button>
-              </>
             )}
           </div>
         </div>
-
-        {/* Active Dark Days Exception List */}
-        <div className="space-y-2">
-          <div className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-            <Moon className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Scheduled Dark Days ({isEditingDarkDays ? draftDarkDays.length : darkDays.length}):</span>
-          </div>
-
-          {(isEditingDarkDays ? draftDarkDays : darkDays).length === 0 ? (
-            <div className="text-xs text-slate-400 py-1 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>No hiatus or dark days scheduled. All {numDays} shoot days are active calls.</span>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              {(isEditingDarkDays ? draftDarkDays : darkDays).map((d) => {
-                const daySchedule = days.find((day) => day.day_number === d);
-                return (
-                  <div
-                    key={d}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-950 border border-indigo-600 text-indigo-200 text-xs font-bold shadow-sm"
-                  >
-                    <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>
-                      Day {d}{daySchedule?.date_display ? ` • ${daySchedule.date_display}` : ''}: Hiatus / Dark Day
-                    </span>
-                    {isEditingDarkDays && (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleDraftDarkDay(d)}
-                        className="p-0.5 rounded hover:bg-indigo-900 text-indigo-400 hover:text-rose-400 transition-colors cursor-pointer"
-                        title={`Remove Day ${d} from dark days`}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Dropdown & Range Tools when configuring dark days */}
-        {isEditingDarkDays && (
-          <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-              {/* Dropdown to add single day */}
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-300">Add Dark Day:</span>
-                <select
-                  value={selectedDarkDayToAdd}
-                  onChange={(e) => setSelectedDarkDayToAdd(Number(e.target.value))}
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  {daysHeader
-                    .filter((d) => !draftDarkDays.includes(d))
-                    .map((d) => {
-                      const daySchedule = days.find((day) => day.day_number === d);
-                      const dateStr = daySchedule?.date_display ? ` (${daySchedule.date_display})` : '';
-                      return (
-                        <option key={d} value={d}>
-                          Day {d}{dateStr} of {numDays} (Shoot Call)
-                        </option>
-                      );
-                    })}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleAddSingleDarkDay}
-                  disabled={draftDarkDays.includes(selectedDarkDayToAdd)}
-                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all cursor-pointer shadow-sm"
-                >
-                  + Add Dark Day
-                </button>
-              </div>
-
-              {/* Multi-Day Range Selector for longer productions (e.g. 20-100 days) */}
-              <div className="flex items-center gap-2 pl-3 border-l border-slate-800">
-                <span className="font-semibold text-slate-400">Multi-Day Range:</span>
-                <span className="text-[11px] text-slate-500">Day</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={numDays}
-                  value={rangeStart}
-                  onChange={(e) => setRangeStart(Number(e.target.value))}
-                  className="w-12 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white text-center"
-                />
-                <span className="text-[11px] text-slate-500">to</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={numDays}
-                  value={rangeEnd}
-                  onChange={(e) => setRangeEnd(Number(e.target.value))}
-                  className="w-12 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-xs text-white text-center"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyDarkRange}
-                  className="px-2.5 py-1 rounded bg-slate-800 hover:bg-indigo-950 border border-slate-700 text-slate-200 hover:text-indigo-200 text-xs font-semibold cursor-pointer"
-                >
-                  Mark Range Dark
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Compact Quick Pills Strip (shown for shoots <= 12 days, or as optional quick glance) */}
-        {numDays <= 12 && (
-          <div className="pt-1">
-            <div className="text-[10px] text-slate-500 font-medium mb-1">
-              Quick Day Toggle ({numDays} Days):
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {daysHeader.map((d) => {
-                const isDark = isDayDark(d);
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => {
-                      if (isEditingDarkDays) {
-                        handleToggleDraftDarkDay(d);
-                      } else {
-                        setIsEditingDarkDays(true);
-                        handleToggleDraftDarkDay(d);
-                      }
-                    }}
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all shrink-0 ${
-                      isDark
-                        ? 'bg-indigo-950 border-indigo-600 text-indigo-200 shadow-md shadow-indigo-950/60 ring-1 ring-indigo-500/30'
-                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
-                    } cursor-pointer hover:scale-105`}
-                    title={
-                      isEditingDarkDays
-                        ? isDark
-                          ? `Day ${d}: Dark Day (Click to reopen as Shoot Day)`
-                          : `Day ${d}: Shoot Day (Click to mark Dark Day)`
-                        : isDark
-                        ? `Day ${d}: Pre-Planned Dark Day (Hiatus). Click to edit.`
-                        : `Day ${d}: Scheduled Shoot Day. Click to edit.`
-                    }
-                  >
-                    <span className={`w-2 h-2 rounded-full ${isDark ? 'bg-indigo-400 animate-pulse' : 'bg-emerald-400'}`} />
-                    <span className="font-mono font-bold">Day {d}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                        isDark ? 'bg-indigo-900/90 text-indigo-200' : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {isDark ? '🌙 Dark' : '🎬 Shoot'}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Cross-Link notice to Sudden Chaos Off Days */}
-        <div className="text-[11px] text-slate-400 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-2 border-t border-slate-800/60">
-          <span>
-            Looking to simulate an <strong className="text-rose-300">unplanned / sudden emergency day shutdown</strong> (Force Majeure, sudden storm)?
-          </span>
-          {onOpenChaos && (
-            <button
-              onClick={onOpenChaos}
-              className="text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1 hover:underline cursor-pointer self-start sm:self-auto"
-            >
-              <span>Open Throw Chaos (Sudden Day Shutdown) 🚨</span>
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Instructional Guidance Callout */}
       {isEditing ? (
         <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200/90 flex items-start gap-2.5">
           <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="leading-relaxed">
-            <span className="font-bold text-amber-300">Editing Contract & Permit Blackouts:</span> Click any matrix cell to toggle actor contract blackouts or location permit restrictions (🚫). Pre-planned company dark days are managed separately in the Calendar above. Click <strong className="text-white">"Save Blackouts"</strong> to stage your changes, then click <strong className="text-emerald-300">"⚡ Optimize Schedule"</strong> when ready to solve the stripboard.
+            <span className="font-bold text-amber-300">Editing Contract & Permit Blackouts:</span> Click any matrix cell to toggle actor contract blackouts or location permit restrictions (🚫). Pre-planned company dark days are managed in the Plan Editor. Click <strong className="text-white">"Save Blackouts"</strong> to stage your changes, then click <strong className="text-emerald-300">"⚡ Optimize Schedule"</strong> when ready to solve the stripboard.
           </div>
         </div>
       ) : (
@@ -780,8 +517,17 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 font-medium">
-                <th className="py-3 px-3 min-w-[180px] sticky left-0 bg-slate-900/95 z-20 border-r border-slate-800 shadow-md">
+                <th className="py-3 px-3 min-w-[190px] sticky left-0 bg-slate-900/95 z-20 border-r border-slate-800 shadow-md">
                   Character / Actor
+                </th>
+                <th className="py-3 px-3 text-right min-w-[105px] border-r border-slate-800/80 bg-slate-900/70 font-semibold text-slate-300">
+                  Talent Cost
+                </th>
+                <th className="py-3 px-2 text-center min-w-[60px] border-r border-slate-800/60 bg-slate-900/50 font-semibold text-slate-300">
+                  Work
+                </th>
+                <th className="py-3 px-2 text-center min-w-[60px] border-r border-slate-800/80 bg-slate-900/50 font-semibold text-slate-300">
+                  Hold
                 </th>
                 {visibleDays.map((d) => {
                   const dayDark = isDayDark(d);
@@ -806,9 +552,6 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                     </th>
                   );
                 })}
-                <th className="py-3 px-3 text-center">Work</th>
-                <th className="py-3 px-3 text-center">Hold</th>
-                <th className="py-3 px-3 text-right">Talent Cost</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -816,7 +559,29 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                 <tr key={row.actor_id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="py-3 px-3 sticky left-0 bg-slate-900/95 z-10 border-r border-slate-800 shadow-md">
                     <div className="font-semibold text-white">{row.character_name}</div>
-                    <div className="text-[11px] text-slate-400">{row.name}</div>
+                    <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                      <span>{row.name}</span>
+                      <span className="text-slate-600">•</span>
+                      <span className="text-emerald-400 font-mono font-medium">${row.talent_cost.toLocaleString()}</span>
+                    </div>
+                  </td>
+
+                  <td className="py-3 px-3 text-right font-mono font-bold text-white bg-slate-900/40 border-r border-slate-800/80 whitespace-nowrap">
+                    ${row.talent_cost.toLocaleString()}
+                  </td>
+
+                  <td className="py-3 px-2 text-center font-mono font-semibold text-slate-300 bg-slate-900/20 border-r border-slate-800/60">
+                    {row.work_days}d
+                  </td>
+
+                  <td className="py-3 px-2 text-center font-mono border-r border-slate-800/80">
+                    {row.hold_days > 0 ? (
+                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold">
+                        {row.hold_days}d
+                      </span>
+                    ) : (
+                      <span className="text-slate-500">0d</span>
+                    )}
                   </td>
 
                   {visibleDays.map((d) => {
@@ -893,27 +658,46 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                       </td>
                     );
                   })}
-
-                  <td className="py-3 px-3 text-center font-mono font-semibold text-slate-300">
-                    {row.work_days}d
-                  </td>
-
-                  <td className="py-3 px-3 text-center font-mono">
-                    {row.hold_days > 0 ? (
-                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold">
-                        {row.hold_days}d
-                      </span>
-                    ) : (
-                      <span className="text-slate-500">0d</span>
-                    )}
-                  </td>
-
-                  <td className="py-3 px-3 text-right font-mono font-bold text-white">
-                    ${row.talent_cost.toLocaleString()}
-                  </td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-700 bg-slate-950/90 font-bold text-xs">
+                <td className="py-3 px-3 sticky left-0 bg-slate-950 z-20 border-r border-slate-800 shadow-md text-white">
+                  TOTALS ({doodMatrix.length} Actors)
+                </td>
+                <td className="py-3 px-3 text-right font-mono font-black text-emerald-400 bg-slate-950 border-r border-slate-800/80 whitespace-nowrap">
+                  ${totalCastCost.toLocaleString()}
+                </td>
+                <td className="py-3 px-2 text-center font-mono font-bold text-slate-200 bg-slate-950 border-r border-slate-800/60">
+                  {totalCastWork}d
+                </td>
+                <td className="py-3 px-2 text-center font-mono border-r border-slate-800/80">
+                  {totalCastHold > 0 ? (
+                    <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold">
+                      {totalCastHold}d
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">0d</span>
+                  )}
+                </td>
+                {visibleDays.map((d) => {
+                  const dayDark = isDayDark(d);
+                  const activeActorsOnDay = doodMatrix.filter((r) => r.day_codes[d - 1] === 'W').length;
+                  return (
+                    <td key={d} className="py-2.5 px-2 text-center font-mono text-[11px]">
+                      {dayDark ? (
+                        <span className="text-indigo-400 font-bold">Hiatus</span>
+                      ) : activeActorsOnDay > 0 ? (
+                        <span className="text-emerald-400 font-semibold">{activeActorsOnDay} cast</span>
+                      ) : (
+                        <span className="text-slate-600">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}
@@ -924,8 +708,14 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 font-medium">
-                <th className="py-3 px-3 min-w-[200px] sticky left-0 bg-slate-900/95 z-20 border-r border-slate-800 shadow-md">
+                <th className="py-3 px-3 min-w-[190px] sticky left-0 bg-slate-900/95 z-20 border-r border-slate-800 shadow-md">
                   Filming Location
+                </th>
+                <th className="py-3 px-3 text-center min-w-[85px] border-r border-slate-800/80 bg-slate-900/70 font-semibold text-slate-300">
+                  Total Days
+                </th>
+                <th className="py-3 px-3 text-center min-w-[75px] border-r border-slate-800/80 bg-slate-900/50 font-semibold text-slate-300">
+                  Status
                 </th>
                 {visibleDays.map((d) => {
                   const dayDark = isDayDark(d);
@@ -950,8 +740,6 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                     </th>
                   );
                 })}
-                <th className="py-3 px-3 text-center">Total Days</th>
-                <th className="py-3 px-3 text-right">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -960,9 +748,28 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
 
                 return (
                   <tr key={loc} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-3 font-semibold text-white flex items-center gap-2 sticky left-0 bg-slate-900/95 z-10 border-r border-slate-800 shadow-md">
-                      <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span>{loc}</span>
+                    <td className="py-3 px-3 sticky left-0 bg-slate-900/95 z-10 border-r border-slate-800 shadow-md">
+                      <div className="flex items-center gap-2 font-semibold text-white">
+                        <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span>{loc}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 ml-5.5">
+                        {totalShootDaysAtLoc}d • {totalShootDaysAtLoc > 0 ? <span className="text-emerald-400 font-medium">Active</span> : <span className="text-slate-500">Idle</span>}
+                      </div>
+                    </td>
+
+                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-200 bg-slate-900/40 border-r border-slate-800/80">
+                      {totalShootDaysAtLoc}d
+                    </td>
+
+                    <td className="py-3 px-3 text-center border-r border-slate-800/80">
+                      {totalShootDaysAtLoc > 0 ? (
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-[10px]">Idle</span>
+                      )}
                     </td>
 
                     {visibleDays.map((d) => {
@@ -1037,24 +844,41 @@ export const AvailabilityMatrix: React.FC<AvailabilityMatrixProps> = ({
                         </td>
                       );
                     })}
-
-                    <td className="py-3 px-3 text-center font-mono font-semibold text-slate-300">
-                      {totalShootDaysAtLoc}d
-                    </td>
-
-                    <td className="py-3 px-3 text-right">
-                      {totalShootDaysAtLoc > 0 ? (
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 text-[10px]">Idle</span>
-                      )}
-                    </td>
                   </tr>
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-700 bg-slate-950/90 font-bold text-xs">
+                <td className="py-3 px-3 sticky left-0 bg-slate-950 z-20 border-r border-slate-800 shadow-md text-white">
+                  TOTALS ({allLocations.length} Locations)
+                </td>
+                <td className="py-3 px-3 text-center font-mono font-black text-slate-200 bg-slate-950 border-r border-slate-800/80">
+                  {totalLocationDays}d
+                </td>
+                <td className="py-3 px-3 text-center border-r border-slate-800/80">
+                  <span className="text-slate-400 font-normal">
+                    {allLocations.filter((loc) => days.some((d) => d.locations.includes(loc))).length} Active
+                  </span>
+                </td>
+                {visibleDays.map((d) => {
+                  const dayDark = isDayDark(d);
+                  const daySchedule = days.find((day) => day.day_number === d);
+                  const locsCount = daySchedule?.locations.length || 0;
+                  return (
+                    <td key={d} className="py-2.5 px-2 text-center font-mono text-[11px]">
+                      {dayDark ? (
+                        <span className="text-indigo-400 font-bold">Hiatus</span>
+                      ) : locsCount > 0 ? (
+                        <span className="text-emerald-400 font-semibold">{locsCount} loc</span>
+                      ) : (
+                        <span className="text-slate-600">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}
