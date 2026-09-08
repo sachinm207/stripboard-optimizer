@@ -7,9 +7,10 @@ interface CostMeterProps {
   disruptions: DisruptionAlert[];
   status?: string;
   onSelectTab?: (tab: 'stripboard' | 'dood' | 'union' | 'kafka') => void;
+  onOpenChaos?: () => void;
 }
 
-export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, status, onSelectTab }) => {
+export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, status, onSelectTab, onOpenChaos }) => {
   const isCompliant = metrics.total_turnaround_violations === 0;
   const isRaw = status === 'RAW_UNOPTIMIZED';
   const isPending = status === 'PENDING_OPTIMIZATION';
@@ -123,10 +124,18 @@ export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, stat
       </div>
 
       {/* 6. Active Disruptions */}
-      <div className={`bg-slate-900/90 border ${disruptions.length > 0 ? 'border-amber-500/40' : 'border-slate-800'} rounded-xl p-3.5 shadow-lg relative overflow-hidden group`}>
+      <div
+        onClick={onOpenChaos}
+        className={`bg-slate-900/90 border ${
+          disruptions.length > 0
+            ? 'border-amber-500/40 hover:border-amber-400/80 shadow-amber-950/20'
+            : 'border-slate-800 hover:border-slate-700'
+        } rounded-xl p-3.5 shadow-lg relative overflow-hidden group cursor-pointer transition-all hover:scale-[1.02]`}
+        title="Click to open Emergency Chaos Simulation Drawer"
+      >
         <div className="flex items-center justify-between text-xs text-slate-400 font-medium mb-1">
-          <span>Chaos Ingested</span>
-          <AlertTriangle className={`w-4 h-4 ${disruptions.length > 0 ? 'text-amber-400 animate-bounce' : 'text-slate-500'}`} />
+          <span className="group-hover:text-amber-300 transition-colors">Chaos Ingested</span>
+          <AlertTriangle className={`w-4 h-4 ${disruptions.length > 0 ? 'text-amber-400 animate-bounce' : 'text-slate-500 group-hover:text-amber-400'}`} />
         </div>
         <div className="text-xl lg:text-2xl font-black text-white tracking-tight">
           {disruptions.length} <span className="text-xs font-normal text-slate-400">alerts</span>
@@ -134,6 +143,10 @@ export const CostMeter: React.FC<CostMeterProps> = ({ metrics, disruptions, stat
         <p className="text-[11px] text-slate-400 font-mono mt-0.5">
           {disruptions.length > 0 ? 'Re-optimized in real time' : 'Nominal schedule'}
         </p>
+        <div className="mt-2 pt-1.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-amber-300/80 group-hover:text-amber-300">
+          <span>Open Chaos Lab</span>
+          <span>→</span>
+        </div>
       </div>
     </div>
   );

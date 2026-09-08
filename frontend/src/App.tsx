@@ -462,6 +462,7 @@ export const App: React.FC = () => {
               disruptions={solution.disruptions_applied}
               status={solution.status}
               onSelectTab={setActiveTab}
+              onOpenChaos={() => setIsChaosOpen(true)}
             />
 
             {/* Optimization Status Callout Banner */}
