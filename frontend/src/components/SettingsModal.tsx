@@ -67,9 +67,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Sliders className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white">Production Policy & Union Rules</h3>
+              <h3 className="font-bold text-base text-white">Production Settings</h3>
               <p className="text-xs text-slate-400">
-                Configure labor penalties, calendar start date, and work hour caps
+                Configure start date, SAG-AFTRA turnaround rates, permit notice, and daily limits
               </p>
             </div>
           </div>

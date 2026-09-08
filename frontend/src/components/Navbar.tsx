@@ -162,11 +162,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenSettings && (
             <button
               onClick={onOpenSettings}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 hover:text-purple-200 text-xs font-semibold transition-all shadow-sm"
-              title="Configure SAG-AFTRA penalty rates, permit lead times, and hour limits"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 hover:text-purple-200 text-xs font-semibold transition-all shadow-sm cursor-pointer"
+              title="Configure shoot start date, SAG-AFTRA penalty rates, permit lead times, and daily limits"
             >
               <Sliders className="w-3.5 h-3.5 text-purple-400" />
-              <span>Rules & Policy</span>
+              <span>Settings</span>
             </button>
           )}
 
