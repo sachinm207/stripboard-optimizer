@@ -36,8 +36,6 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
   const [disruptionType, setDisruptionType] = useState('ACTOR_ILLNESS');
   const [selectedDays, setSelectedDays] = useState<number[]>([2]);
   const [reason, setReason] = useState('Emergency medical isolation (48h)');
-  const [shutdownDay, setShutdownDay] = useState<number>(3);
-  const [shutdownReason, setShutdownReason] = useState<string>('Emergency Force Majeure: Citywide flash flood warning and municipal curfew');
 
   if (!isOpen) return null;
 
@@ -101,103 +99,25 @@ export const ChaosDrawer: React.FC<ChaosDrawerProps> = ({
 
         {/* 2-Column Wide Grid Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4">
-          {/* Left Column: Sudden Day Shutdown & Active Disruptions */}
-          <div className="space-y-4">
-            {/* DEDICATED SUDDEN EMERGENCY DAY SHUTDOWN SECTION */}
-            <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-950/50 via-slate-900 to-rose-950/40 border-2 border-rose-500/50 shadow-xl space-y-3">
-          <div className="flex items-start gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0 mt-0.5">
-              <Moon className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
+          {/* Left Column: Active Disruptions & Status */}
+          <div className="space-y-4 flex flex-col">
+            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                  🚨 Sudden Day Shutdown
+                  Production Disruption Overview
                 </h4>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30">
-                  Force Majeure
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Add sudden real-world filming emergencies (actor illness, weather freezes, permit revocations, or complete day shutdowns).
+              </p>
+              <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span>
+                  Active disruptions on schedule: <strong className="text-white font-mono">{activeDisruptions.length}</strong>
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300 mt-0.5">
-                Instantly evacuate any shooting day due to sudden disasters, curfews, or strikes.
-              </p>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-300 mb-1.5">
-              Select Day to Evacuate & Lock Down:
-            </label>
-            <div className="flex items-center gap-2">
-              <select
-                value={shutdownDay}
-                onChange={(e) => setShutdownDay(Number(e.target.value))}
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-rose-500 cursor-pointer"
-              >
-                {daysList.map((d) => {
-                  const daySchedule = days.find((day) => day.day_number === d);
-                  const dateStr = daySchedule?.date_display ? ` (${daySchedule.date_display})` : '';
-                  return (
-                    <option key={d} value={d}>
-                      Day {d}{dateStr} of {daysList.length} (Shoot Call)
-                    </option>
-                  );
-                })}
-              </select>
-              {daysList.length <= 8 && (
-                <div className="flex items-center gap-1">
-                  {daysList.map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setShutdownDay(d)}
-                      className={`w-7 h-7 rounded border text-[11px] font-bold transition-all cursor-pointer ${
-                        shutdownDay === d
-                          ? 'bg-rose-600 text-white border-rose-400 shadow-sm'
-                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] text-slate-400 font-medium mb-1">
-              Shutdown Reason:
-            </label>
-            <input
-              type="text"
-              value={shutdownReason}
-              onChange={(e) => setShutdownReason(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500"
-            />
-          </div>
-
-            <button
-              type="button"
-              disabled={isSolving}
-              onClick={() => {
-                onInject({
-                  alert_id: `alert_shutdown_${Date.now()}`,
-                  production_id: 'prod_neon_horizon',
-                  disruption_type: 'DAY_SHUTDOWN',
-                  severity: 'CRITICAL',
-                  affected_shoot_days: [shutdownDay],
-                  reason: shutdownReason || `Force Majeure: Emergency Day ${shutdownDay} Shutdown`,
-                });
-              }}
-              className="w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 active:scale-98 text-white text-xs font-bold transition-all shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Moon className="w-4 h-4" />
-              <span>
-                {isSolving ? 'Evacuating Day...' : `🚨 Evacuate & Shutdown Day ${shutdownDay}`}
-              </span>
-            </button>
-          </div>
 
           {/* Active Disruptions Ingested */}
           {activeDisruptions.length > 0 ? (
