@@ -541,7 +541,7 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                 <div>
                   <h4 className="text-xs font-bold text-white uppercase tracking-wider">Shooting Script Scenes</h4>
                   <p className="text-[11px] text-slate-400">
-                    Existing scenes from current stripboard. Modify durations, lighting settings, cast calls, and locked days.
+                    Existing scenes from current stripboard. Modify durations, lighting, cast calls, or lock scenes to fixed shoot days. To let the optimizer place scenes freely, leave them as <span className="text-slate-200 font-semibold">"Flexible (Auto-Schedule)"</span>.
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -663,7 +663,14 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({
                           </div>
 
                           {/* Hard Pin to Day Lock */}
-                          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 shadow-sm">
+                          <div
+                            className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 shadow-sm"
+                            title={
+                              sc.locked_day
+                                ? `Day ${sc.locked_day} is hard-locked: The CP-SAT solver is forced to schedule this scene on Day ${sc.locked_day}. Change to 'Flexible' to unlock.`
+                                : "Flexible: The solver will automatically place this scene on the optimal day. Select a day to hard-lock it."
+                            }
+                          >
                             {sc.locked_day ? (
                               <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                             ) : (
